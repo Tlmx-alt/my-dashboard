@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My Dashboard</title>
+<script>try { const t = JSON.parse(localStorage.getItem("dash-theme")); if (t) document.documentElement.dataset.theme = t; } catch {}</script>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="aurora" aria-hidden="true"><div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div><div class="blob b4"></div><div class="blob b5"></div></div>
+<canvas id="confetti" aria-hidden="true"></canvas>
+<div class="wrap">
+  <header>
+    <div>
+      <h1><span id="greet">Hello</span>, <input id="name" type="text" placeholder="your name" maxlength="24" aria-label="Your name" autocomplete="off"></h1>
+      <div class="sub"><span id="sub"></span><span class="sync" id="sync" title=""><i></i><span></span></span></div>
+    </div>
+    <div class="top-right">
+      <div class="clock"><b id="now">--:--</b><span id="date"></span></div>
+      <button class="theme" id="theme" aria-label="Toggle dark mode" title="Toggle dark mode"><svg class="ico sun"><use href="#i-sun"/></svg><svg class="ico moon"><use href="#i-moon"/></svg></button>
+    </div>
+  </header>
+
+  <main class="grid">
+    <!-- Quote -->
+    <section class="card c-quote" aria-label="Quote of the day">
+      <span class="qmark" aria-hidden="true">&ldquo;</span>
+      <figure id="quote"><blockquote id="qtext"></blockquote><figcaption id="qby"></figcaption></figure>
+      <button class="icon-btn" id="qnext" aria-label="Show another quote" title="Another quote"><svg class="ico"><use href="#i-quote"/></svg></button>
+    </section>
+
+    <!-- Timer -->
+    <section class="card c-timer" aria-label="Pomodoro timer">
+      <span class="halo" aria-hidden="true"></span>
+      <div class="tabs" id="tabs" role="tablist">
+        <button data-mode="focus" class="active">Focus</button>
+        <button data-mode="short">Short break</button>
+        <button data-mode="long">Long break</button>
+      </div>
+      <div class="ring" id="ring">
+        <svg viewBox="0 0 260 260" aria-hidden="true">
+          <circle class="bg" cx="130" cy="130" r="120"/>
+          <circle class="fg" id="arc" cx="130" cy="130" r="120"/>
+        </svg>
+        <div class="time" role="timer"><b id="clock">25:00</b><small id="label">Time to focus</small></div>
+      </div>
+      <div class="controls">
+        <button class="round" id="reset" aria-label="Reset timer"><svg class="ico"><use href="#i-reset"/></svg></button>
+        <button class="primary" id="toggle"><svg class="ico"><use href="#i-play"/></svg><span>Start</span></button>
+        <button class="round" id="skip" aria-label="Skip to next"><svg class="ico"><use href="#i-skip"/></svg></button>
+      </div>
+      <div class="dots" id="dots" aria-hidden="true"></div>
+      <div class="upnext" id="upnext"></div>
+      <details>
+        <summary><svg class="ico" style="width:14px;height:14px"><use href="#i-gear"/></svg> Timer settings</summary>
+        <div class="settings">
+          <label>Focus (min)<input type="number" id="s-focus" min="1" max="120"></label>
+          <label>Short (min)<input type="number" id="s-short" min="1" max="60"></label>
+          <label>Long (min)<input type="number" id="s-long" min="1" max="60"></label>
+        </div>
+        <div class="colors" id="colors"><h3>Colors</h3></div>
+      </details>
+    </section>
+
+    <!-- Stats -->
+    <section class="card c-stats" aria-label="Focus stats">
+      <div class="card-h"><h2><svg class="ico"><use href="#i-chart"/></svg> Today's focus</h2><span class="meta" id="weektotal"></span></div>
+      <div class="stat-row">
+        <div class="stat"><b id="st-sessions">0</b><span>Sessions</span></div>
+        <div class="stat"><b id="st-minutes">0</b><span>Minutes focused</span></div>
+        <div class="stat"><b id="st-streak">0</b><span>Day streak</span></div>
+      </div>
+      <div class="goal">
+        <div class="goal-top"><span>Daily goal</span><span><input type="number" id="goal" min="1" max="30" aria-label="Daily session goal"> sessions</span></div>
+        <div class="bar"><i id="goalbar"></i></div>
+      </div>
+      <div class="week" id="week" aria-label="Last 7 days of focus sessions"></div>
+    </section>
+
+    <!-- Tasks -->
+    <section class="card c-tasks" aria-label="Tasks">
+      <div class="card-h"><h2><svg class="ico"><use href="#i-list"/></svg> Tasks</h2><span class="meta"><span id="taskmeta"></span> <button class="link-btn" id="clearDone">Clear done</button></span></div>
+      <form class="add" id="taskForm">
+        <input type="text" id="taskInput" placeholder="What are you working on?" maxlength="120" aria-label="New task" autocomplete="off">
+        <button aria-label="Add task"><svg class="ico"><use href="#i-plus"/></svg></button>
+      </form>
+      <ul id="tasks"></ul>
+    </section>
+
+    <!-- Deadlines -->
+    <section class="card c-cd" aria-label="Deadlines">
+      <div class="card-h"><h2><svg class="ico"><use href="#i-flag"/></svg> Deadlines</h2></div>
+      <form class="add cd-form" id="cdForm">
+        <input type="text" id="cdText" placeholder="e.g. VAT return due next Thursday" maxlength="160" aria-label="Describe the event and when it is" autocomplete="off">
+        <button aria-label="Add deadline"><svg class="ico"><use href="#i-plus"/></svg></button>
+      </form>
+      <div class="cd-hint" id="cdHint" aria-live="polite"></div>
+      <ul id="cds"></ul>
+    </section>
+
+    <!-- Calendar -->
+    <section class="card c-cal" aria-label="Focus calendar">
+      <div class="card-h"><h2><svg class="ico"><use href="#i-cal"/></svg> Calendar</h2>
+        <span class="cal-nav"><button class="icon-btn" id="calPrev" aria-label="Previous month"><svg class="ico"><use href="#i-left"/></svg></button><b id="calTitle"></b><button class="icon-btn" id="calNext" aria-label="Next month"><svg class="ico"><use href="#i-right"/></svg></button></span></div>
+      <div class="cal" id="cal"></div>
+    </section>
+
+    <!-- Habits -->
+    <section class="card c-habits" aria-label="Habits">
+      <div class="card-h"><h2><svg class="ico"><use href="#i-flame"/></svg> Daily habits</h2><span class="meta" id="habitmeta"></span></div>
+      <form class="add" id="habitForm">
+        <input type="text" id="habitInput" placeholder="New habit" maxlength="40" aria-label="New habit" autocomplete="off">
+        <button aria-label="Add habit"><svg class="ico"><use href="#i-plus"/></svg></button>
+      </form>
+      <ul id="habits"></ul>
+    </section>
+
+    <!-- Water -->
+    <section class="card c-water water" aria-label="Water tracker">
+      <div class="card-h"><h2><svg class="ico"><use href="#i-drop"/></svg> Water</h2></div>
+      <div class="water-row">
+        <div class="big"><span id="wcount">0</span> <small>ml</small></div>
+        <div class="stepper">
+          <button id="wminus" aria-label="Remove 250 ml"><svg class="ico"><use href="#i-minus"/></svg></button>
+          <button id="wplus" class="plus" aria-label="Add 250 ml"><svg class="ico"><use href="#i-plus"/></svg></button>
+        </div>
+      </div>
+      <div class="bar"><i id="wbar"></i></div>
+      <div class="quick" aria-label="Quick add"><button data-ml="150">+150</button><button data-ml="330">+330</button><button data-ml="500">+500</button></div>
+      <div class="goal-top"><span>Daily goal</span><span><input type="number" id="wgoal" min="250" max="10000" step="50" aria-label="Water goal in millilitres"> ml</span></div>
+    </section>
+
+    <!-- Day counter -->
+    <section class="card c-days" aria-label="Day counter">
+      <div class="card-h"><h2><svg class="ico"><use href="#i-hourglass"/></svg> Day counter</h2><span class="meta" id="yearleft"></span></div>
+      <div class="year">
+        <div class="year-n"><span id="yearday">0</span><small id="yeartotal"></small></div>
+        <div class="bar"><i id="yearbar"></i></div>
+      </div>
+      <form class="add days-form" id="dcForm">
+        <input type="text" id="dcName" placeholder="Days since… or until…" maxlength="40" aria-label="What are you counting" autocomplete="off">
+        <input type="date" id="dcDate" aria-label="Start or target date" required>
+        <button aria-label="Add counter"><svg class="ico"><use href="#i-plus"/></svg></button>
+      </form>
+      <ul id="dcs"></ul>
+    </section>
+
+    <!-- Notes -->
+    <section class="card c-notes" aria-label="Notes">
+      <div class="card-h"><h2><svg class="ico"><use href="#i-note"/></svg> Scratchpad</h2><span class="meta" id="saved"></span></div>
+      <textarea id="notes" placeholder="Jot something down…" aria-label="Notes"></textarea>
+    </section>
+  </main>
+</div>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></symbol>
+  <symbol id="i-cal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></symbol>
+  <symbol id="i-left" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></symbol>
+  <symbol id="i-drop" viewBox="0 0 24 24"><path d="M12 2.7l5.7 5.6a8 8 0 1 1-11.4 0z"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></symbol>
+  <symbol id="i-flag" viewBox="0 0 24 24"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></symbol>
+  <symbol id="i-hourglass" viewBox="0 0 24 24"><path d="M6 2h12M6 22h12M7 2v4a5 5 0 0 0 2 4l3 2-3 2a5 5 0 0 0-2 4v4M17 2v4a5 5 0 0 1-2 4l-3 2 3 2a5 5 0 0 1 2 4v4"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><polygon points="6 4 20 12 6 20 6 4" fill="currentColor"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1" fill="currentColor"/><rect x="14" y="4" width="4" height="16" rx="1" fill="currentColor"/></symbol>
+  <symbol id="i-reset" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></symbol>
+  <symbol id="i-skip" viewBox="0 0 24 24"><polygon points="5 4 15 12 5 20 5 4" fill="currentColor"/><line x1="19" y1="5" x2="19" y2="19"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><polyline points="3 6 4 7 6 5"/><polyline points="3 12 4 13 6 11"/><polyline points="3 18 4 19 6 17"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12" stroke-width="3"/></symbol>
+  <symbol id="i-flame" viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.4-.5-2-1-3-1.1-2.1-.2-4 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.2.4-2.4 1-3 0 1.4 1 2.5 2.5 2.5z"/></symbol>
+  <symbol id="i-note" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="14 3 14 9 20 9"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="14" y2="17"/></symbol>
+  <symbol id="i-quote" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.5 15a9 9 0 1 1-2.1-9.4L23 10"/></symbol>
+</svg>
+
+<script src="app.js"></script>
+</body>
+</html>
