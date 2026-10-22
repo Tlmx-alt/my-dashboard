@@ -73,81 +73,19 @@ function setSync(state) {
 }
 setSync();
 
-/* ---------- theme ---------- */
-const root = document.documentElement;
-const savedTheme = load("theme", null);
-if (savedTheme) root.dataset.theme = savedTheme;
-$("theme").onclick = () => {
-  const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
-  root.dataset.theme = dark ? "light" : "dark";
-  save("theme", root.dataset.theme);
-};
-
-/* ---------- confetti ---------- */
-const cvs = $("confetti"), cx = cvs.getContext("2d");
-let parts = [], raf = null;
-function sizeCanvas() { const r = devicePixelRatio || 1; cvs.width = innerWidth * r; cvs.height = innerHeight * r; cx.setTransform(r, 0, 0, r, 0, 0); }
-sizeCanvas(); addEventListener("resize", sizeCanvas);
-function confetti(x, y, count = 40, power = 1) {
-  if (reduceMotion) return;
-  const accent = getComputedStyle(document.body).getPropertyValue("--accent").trim();
-  const colors = [accent, "#f5b83d", "#8b5cf6", "#3b8fd9", "#ff6b8b", "#ffffff"];
-  for (let i = 0; i < count; i++) {
-    const a = Math.random() * Math.PI * 2, v = (2 + Math.random() * 6) * power;
-    parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 4 * power, r: Math.random() * Math.PI, vr: (Math.random() - .5) * .4,
-      w: 5 + Math.random() * 6, h: 3 + Math.random() * 4, c: colors[i % colors.length], life: 1 });
-  }
-  if (!raf) raf = requestAnimationFrame(drawConfetti);
-}
-function drawConfetti() {
-  cx.clearRect(0, 0, innerWidth, innerHeight);
-  parts = parts.filter(p => p.life > 0 && p.y < innerHeight + 20);
-  for (const p of parts) {
-    p.vy += .22; p.vx *= .985; p.x += p.vx; p.y += p.vy; p.r += p.vr; p.life -= .009;
-    cx.save(); cx.globalAlpha = Math.min(1, p.life * 2); cx.translate(p.x, p.y); cx.rotate(p.r);
-    cx.fillStyle = p.c; cx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h * Math.abs(Math.cos(p.r * 2)) + 1); cx.restore();
-  }
-  raf = parts.length ? requestAnimationFrame(drawConfetti) : (cx.clearRect(0, 0, innerWidth, innerHeight), null);
-}
-const burstAt = (node, count, power) => { const r = node.getBoundingClientRect(); confetti(r.left + r.width / 2, r.top + r.height / 2, count, power); };
-
-/* ---------- small animation helpers ---------- */
-function setNum(node, value) {
-  const from = +node.dataset.v || 0;
-  node.dataset.v = value;
-  if (reduceMotion || from === value) { node.textContent = value.toLocaleString(); return; }
-  if (value > from) { node.classList.remove("bump"); void node.offsetWidth; node.classList.add("bump"); }
-  const t0 = performance.now(), dur = 700;
-  const step = t => {
-    const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3);
-    node.textContent = Math.round(from + (value - from) * e).toLocaleString();
-    if (k < 1) requestAnimationFrame(step);
-  };
-  requestAnimationFrame(step);
-}
+/* ---------- small helpers ---------- */
+const setNum = (node, value) => node.textContent = value.toLocaleString();
 function removeAnimated(li, done) {
   if (reduceMotion) return done();
   li.style.height = li.offsetHeight + "px";
   li.classList.add("leaving");
   li.addEventListener("animationend", done, { once: true });
 }
-document.querySelectorAll(".grid > .card").forEach((c, i) => c.style.setProperty("--i", i));
-let spotRaf = null;
-document.querySelector(".grid").addEventListener("pointermove", e => {
-  const card = e.target.closest(".card");
-  if (!card || spotRaf) return;
-  spotRaf = requestAnimationFrame(() => {
-    const r = card.getBoundingClientRect();
-    card.style.setProperty("--mx", e.clientX - r.left + "px");
-    card.style.setProperty("--my", e.clientY - r.top + "px");
-    spotRaf = null;
-  });
-});
 
 /* ---------- header ---------- */
 const nameEl = $("name");
 nameEl.value = load("name", "");
-const fitName = () => nameEl.style.width = Math.max(9, nameEl.value.length + 1) + "ch";
+const fitName = () => nameEl.style.width = (nameEl.value ? nameEl.value.length + 1 : 9) + "ch";
 nameEl.oninput = () => { save("name", nameEl.value.trim()); fitName(); };
 nameEl.onkeydown = e => { if (e.key === "Enter") nameEl.blur(); };
 fitName();
@@ -155,7 +93,9 @@ fitName();
 let today = dayKey();
 function tickClock() {
   const d = new Date(), h = d.getHours();
-  $("now").textContent = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const parts = new Intl.DateTimeFormat([], { hour: "numeric", minute: "2-digit" }).formatToParts(d);  // big time, small AM/PM
+  const period = parts.find(p => p.type === "dayPeriod");
+  $("now").replaceChildren(parts.filter(p => p.type !== "dayPeriod").map(p => p.value).join("").trim(), period ? el("small", { textContent: period.value }) : "");
   $("date").textContent = d.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
   $("greet").textContent = h < 5 ? "Burning the midnight oil" : h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
   if (dayKey() !== today) { today = dayKey(); renderAll(); }
@@ -192,18 +132,16 @@ const QUOTES = [
   ["Men are disturbed not by things, but by the views which they take of things.", "Epictetus"],
 ];
 let quoteIdx = null;
-function showQuote(i, animate) {
+function showQuote(i) {
   quoteIdx = i;
   const [text, by] = QUOTES[i];
   $("qtext").textContent = text;
   $("qby").textContent = "— " + by;
-  if (animate && !reduceMotion) { const f = $("quote"); f.classList.remove("swap"); void f.offsetWidth; f.classList.add("swap"); }
 }
 const dailyQuote = () => Math.floor(new Date(today + "T00:00").getTime() / 864e5) % QUOTES.length;
-$("qnext").onclick = e => {
+$("qnext").onclick = () => {
   let i; do i = Math.floor(Math.random() * QUOTES.length); while (i === quoteIdx);
-  showQuote(i, true);
-  const b = e.currentTarget; b.classList.remove("spin"); void b.offsetWidth; b.classList.add("spin");
+  showQuote(i);
 };
 
 /* ---------- focus log + stats ---------- */
@@ -224,12 +162,7 @@ function renderStats() {
   setNum($("st-streak"), streak());
   $("goal").value = cfg.goal;
   $("goalbar").style.width = Math.min(100, s / cfg.goal * 100) + "%";
-  const days = [...Array(7)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - (6 - i)); return d; });
-  const vals = days.map(d => log[dayKey(d)] || 0), max = Math.max(4, ...vals);
-  $("weektotal").textContent = vals.reduce((a, b) => a + b, 0) + " this week";
-  $("week").replaceChildren(...days.map((d, i) => el("div", { className: i === 6 ? "today" : "", title: `${d.toLocaleDateString([], { weekday: "long" })}: ${vals[i]} sessions` },
-    Object.assign(el("i"), { style: `height:${Math.max(4, vals[i] / max * 100)}%;--d:${i}` }),
-    el("span", { textContent: d.toLocaleDateString([], { weekday: "narrow" }) }))));
+  $("goalbar").parentElement.title = `Daily goal: ${s} of ${cfg.goal} sessions`;
   renderCalendar();
 }
 $("goal").onchange = e => { cfg.goal = Math.min(30, Math.max(1, +e.target.value || cfg.goal)); save("cfg", cfg); renderStats(); };
@@ -239,24 +172,12 @@ const LABELS = { focus: "Time to focus", short: "Take a short break", long: "Tak
 const C = 2 * Math.PI * 120;
 const arc = $("arc");
 arc.style.strokeDasharray = C;
-let mode = "focus", total, remaining, endAt = null, timer = null, shownClock = "";
+let mode = "focus", total, remaining, endAt = null, timer = null;
 const fmt = s => pad(Math.floor(s / 60)) + ":" + pad(s % 60);
 
-function setClock(str) {
-  if (str === shownClock) return;
-  const b = $("clock");
-  if (b.children.length !== str.length) b.replaceChildren(...[...str].map(c => el("span", { className: "d", textContent: c })));
-  else [...str].forEach((c, i) => {
-    const s = b.children[i];
-    if (s.textContent === c) return;
-    s.textContent = c;
-    if (!reduceMotion && shownClock) { s.classList.remove("flip"); void s.offsetWidth; s.classList.add("flip"); }
-  });
-  shownClock = str;
-}
 function renderTimer() {
   const s = Math.ceil(remaining);
-  setClock(fmt(s));
+  $("clock").textContent = fmt(s);
   $("label").textContent = LABELS[mode];
   $("toggle").lastElementChild.textContent = timer ? "Pause" : (remaining < total ? "Resume" : "Start");
   $("toggle").firstElementChild.firstElementChild.setAttribute("href", timer ? "#i-pause" : "#i-play");
@@ -268,16 +189,6 @@ function renderTimer() {
   const inCycle = sessionsToday() % 4;
   $("dots").replaceChildren(...[0, 1, 2, 3].map(i => el("i", { className: i < inCycle ? "on" : "" })));
 }
-// focus colour: slowly drifts between blue and violet (updated 4x a second, only while in focus mode)
-function cycleHue() {
-  if (cfg.colors && cfg.colors.focus) return;  // you picked a focus colour: no drifting
-  if (reduceMotion) return document.documentElement.style.setProperty("--fh", "255");
-  if (mode !== "focus" || document.hidden) return;
-  const t = Date.now() / 1000;
-  document.documentElement.style.setProperty("--fh", (270 + 28 * Math.sin(t * 2 * Math.PI / 45)).toFixed(1));
-}
-setInterval(cycleHue, 500);
-
 const saveTimer = () => save("timer", { mode, remaining, running: !!timer, endAt });
 function setMode(m) { stop(); mode = m; total = remaining = cfg[m] * 60; saveTimer(); renderTimer(); }
 function stop() { clearInterval(timer); timer = null; saveTimer(); }
@@ -293,10 +204,7 @@ function nextMode() { return mode !== "focus" ? "focus" : (sessionsToday() % 4 =
 function logSession() { log[dayKey()] = sessionsToday() + 1; save("log", log); renderStats(); }
 function finish() {
   stop(); beep();
-  if (mode === "focus") {
-    logSession();
-    burstAt($("ring"), 90, 1.4);
-  }
+  if (mode === "focus") logSession();
   setMode(nextMode());
 }
 function beep() {
@@ -316,7 +224,7 @@ $("reset").onclick = () => setMode(mode);
 $("skip").onclick = () => setMode(mode === "focus" ? ((sessionsToday() + 1) % 4 === 0 ? "long" : "short") : "focus");
 $("tabs").onclick = e => { if (e.target.dataset.mode) setMode(e.target.dataset.mode); };
 document.addEventListener("keydown", e => {
-  if (e.code === "Space" && !/INPUT|TEXTAREA|BUTTON|SUMMARY|SELECT/.test(e.target.tagName)) { e.preventDefault(); $("toggle").click(); }
+  if (e.code === "Space" && !/INPUT|TEXTAREA|BUTTON|SUMMARY|SELECT/.test(e.target.tagName) && !document.querySelector(".c-timer").hidden && !$("settings").open) { e.preventDefault(); $("toggle").click(); }
 });
 for (const k of ["focus", "short", "long"]) {
   const input = $("s-" + k);
@@ -332,7 +240,7 @@ for (const k of ["focus", "short", "long"]) {
 /* ---------- colour choices for each mode ---------- */
 const PRESETS = [["Malibu", "#4aa3f0"], ["Violet", "#8b5cf6"], ["Pink", "#ec4899"], ["Red", "#cf4129"], ["Orange", "#f59e0b"], ["Lime", "#84cc16"], ["Green", "#1b7a4e"], ["Teal", "#14b8a6"]];
 const MODE_NAMES = { focus: "Focus", short: "Short break", long: "Long break" };
-const DEFAULT_COLOR = { focus: "#4aa3f0", short: "#cf4129", long: "#1b7a4e" };
+const DEFAULT_COLOR = { focus: "#4a6cf7", short: "#cf4129", long: "#1b7a4e" };
 function readableOn(hex) {  // dark text on light colours, white on dark ones
   const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255).map(v => v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4));
   return .2126 * r + .7152 * g + .0722 * b > .3 ? "#0a2540" : "#fff";
@@ -351,7 +259,7 @@ function setColor(mode, hex) {
 }
 function renderColors() {
   const box = $("colors"), c = cfg.colors || {};
-  box.replaceChildren(el("h3", { textContent: "Colors" }), ...Object.keys(MODE_NAMES).map(m => {
+  box.replaceChildren(...Object.keys(MODE_NAMES).map(m => {
     const cur = (c[m] || "").toLowerCase();
     const dots = PRESETS.map(([name, hex]) => {
       const b = el("button", { type: "button", className: "dot", ariaLabel: `${MODE_NAMES[m]}: ${name}`, title: name, onclick: () => setColor(m, hex) });
@@ -360,9 +268,9 @@ function renderColors() {
     const custom = !!cur && !PRESETS.some(([, h]) => h === cur);
     const picker = el("label", { className: "pick" + (custom ? " on" : ""), title: "Pick any color" },
       el("input", { type: "color", value: cur || DEFAULT_COLOR[m], ariaLabel: `${MODE_NAMES[m]}: custom color`, onchange: e => setColor(m, e.target.value) }));
-    const def = el("button", { type: "button", className: "def", textContent: m === "focus" ? "Blue to violet" : "Default", ariaLabel: `${MODE_NAMES[m]}: default`, onclick: () => setColor(m, null) });
+    const def = el("button", { type: "button", className: "def", textContent: "Default", ariaLabel: `${MODE_NAMES[m]}: default`, onclick: () => setColor(m, null) });
     def.setAttribute("aria-pressed", !cur);
-    return el("div", { className: "color-row" }, el("span", {}, el("i", { style: `--sw:${cur || DEFAULT_COLOR[m]}` }), MODE_NAMES[m]), el("div", { className: "sw" }, ...dots, picker, def));
+    return el("div", { className: "color-row" }, el("span", { textContent: MODE_NAMES[m] + " color" }), el("div", { className: "sw" }, ...dots, picker, def));
   }));
 }
 applyColors(); renderColors();
@@ -376,7 +284,6 @@ function renderTasks() {
   $("tasks").replaceChildren(...(tasks.length ? tasks.map(t => {
     const box = el("button", { className: "check", ariaLabel: "Toggle done", onclick: () => {
       t.done = !t.done; save("tasks", tasks);
-      if (t.done) burstAt(box, 18, .6);
       renderTasks();
     } }, icon("check"));
     box.setAttribute("aria-checked", t.done);
@@ -412,7 +319,6 @@ function renderHabits() {
     const box = el("button", { className: "check", ariaLabel: `Mark ${h.name} done today`, onclick: () => {
       h.days = on ? h.days.filter(d => d !== t) : [...h.days, t].slice(-400);
       save("habits", habits);
-      if (!on) burstAt(box, habits.every(x => x.days.includes(t)) ? 70 : 16, habits.every(x => x.days.includes(t)) ? 1.2 : .6);
       renderHabits();
     } }, icon("check"));
     box.setAttribute("aria-checked", on);
@@ -598,9 +504,7 @@ function renderWater() {
   $("wbar").style.width = Math.min(100, n / cfg.waterGoal * 100) + "%";
 }
 const addWater = ml => {
-  const before = water[dayKey()] || 0, n = Math.max(0, before + ml);
-  water[dayKey()] = n; save("water", water); renderWater();
-  if (ml > 0 && before < cfg.waterGoal && n >= cfg.waterGoal) burstAt($("wplus"), 60, 1);
+  water[dayKey()] = Math.max(0, (water[dayKey()] || 0) + ml); save("water", water); renderWater();
 };
 $("wplus").onclick = () => addWater(250);
 $("wminus").onclick = () => addWater(-250);
@@ -646,24 +550,109 @@ notes.oninput = () => {
   noteT = setTimeout(() => { save("notes", notes.value); $("saved").textContent = "Saved"; setTimeout(() => $("saved").textContent = "", 1500); }, 400);
 };
 
-/* ---------- button ripple ---------- */
-document.addEventListener("pointerdown", e => {
-  const b = e.target.closest("button");
+/* ---------- customize panel: wallpaper, theme, which widgets show ---------- */
+const root = document.documentElement, dialog = $("settings");
+$("openSettings").onclick = () => { renderSettings(); dialog.showModal(); };
+$("closeSettings").onclick = () => dialog.close();
+dialog.onclick = e => { if (e.target === dialog) dialog.close(); };  // click on the dimmed backdrop
+
+// wallpaper: a preset (gradients in styles.css), an uploaded photo (kept in this browser only), or an image link
+const WALLS = [["plain", "Plain"], ["mist", "Mist"], ["sand", "Sand"], ["peach", "Peach"], ["sage", "Sage"], ["lavender", "Lavender"],
+  ["dusk", "Dusk"], ["ocean", "Ocean"], ["forest", "Forest"], ["night", "Night"]];
+const IMG_KEY = "wallpaper-image";  // not "dash-": the photo stays out of data.json, which is re-sent on every save
+let wall = Object.assign({ id: "plain", url: "", dim: 25 }, load("wallpaper", {}));
+const storedImage = () => { try { return localStorage.getItem(IMG_KEY); } catch { return null; } };
+const cssUrl = src => `url(${JSON.stringify(src)})`;
+function applyWallpaper() {
+  const src = wall.id === "upload" ? storedImage() : wall.id === "url" ? wall.url : null;
+  if (src) { root.dataset.wall = "image"; root.style.setProperty("--wall-img", cssUrl(src)); root.style.setProperty("--dim", wall.dim / 100); }
+  else { root.style.removeProperty("--wall-img"); if (WALLS.some(([id]) => id === wall.id)) root.dataset.wall = wall.id; else delete root.dataset.wall; }
+}
+function setWall(changes) { Object.assign(wall, changes); save("wallpaper", wall); applyWallpaper(); renderSettings(); }
+const wallMsg = text => $("wallMsg").textContent = text;
+
+$("wallFile").onchange = async e => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
+  wallMsg("Loading photo…");
+  try {
+    const img = new Image();
+    img.src = URL.createObjectURL(file);
+    await img.decode().finally(() => URL.revokeObjectURL(img.src));
+    // shrink big photos so they fit in browser storage; try smaller sizes if the first is still too large
+    for (const [max, q] of [[2560, .85], [1920, .8], [1440, .7]]) {
+      const k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = Object.assign(document.createElement("canvas"), { width: Math.round(img.naturalWidth * k), height: Math.round(img.naturalHeight * k) });
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      try { localStorage.setItem(IMG_KEY, c.toDataURL("image/jpeg", q)); wallMsg("Photo saved in this browser."); return setWall({ id: "upload" }); }
+      catch {}
+    }
+    wallMsg("That photo is too large to store. Try a smaller one, or use an image link.");
+  } catch { wallMsg("Couldn't read that file. Try a JPEG or PNG."); }
+};
+function useUrl() {
+  const raw = $("wallUrl").value.trim();
+  if (!raw) return;
+  let url;
+  try { url = new URL(raw); } catch {}
+  if (!url || !/^https?:$/.test(url.protocol)) return wallMsg("Paste a link that starts with https://");
+  wallMsg("Loading image…");
+  const img = new Image();
+  img.onload = () => { wallMsg(""); setWall({ id: "url", url: url.href }); };
+  img.onerror = () => wallMsg("Couldn't load an image from that link.");
+  img.src = url.href;
+}
+$("wallUrlBtn").onclick = useUrl;
+$("wallUrl").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); useUrl(); } };
+$("wallDim").oninput = e => { wall.dim = +e.target.value; root.style.setProperty("--dim", wall.dim / 100); };
+$("wallDim").onchange = () => save("wallpaper", wall);
+
+// theme: Auto follows the system setting
+$("themeSeg").onclick = e => {
+  const b = e.target.closest("[data-t]");
   if (!b) return;
-  const r = b.getBoundingClientRect(), d = Math.max(r.width, r.height) * 2;
-  const rp = el("span", { className: "ripple" });
-  rp.style.cssText = `width:${d}px;height:${d}px;left:${e.clientX - r.left - d / 2}px;top:${e.clientY - r.top - d / 2}px`;
-  b.appendChild(rp);
-  rp.onanimationend = () => rp.remove();
-  if (b.closest(".c-timer") && !b.closest("details")) {
-    const ring = $("ring"); ring.classList.remove("pulse"); void ring.offsetWidth; ring.classList.add("pulse");
+  if (b.dataset.t) root.dataset.theme = b.dataset.t; else delete root.dataset.theme;
+  save("theme", b.dataset.t || null);
+  renderSettings();
+};
+const savedTheme = load("theme", null);
+if (savedTheme) root.dataset.theme = savedTheme;
+
+// widgets you can hide
+const WIDGETS = { quote: "Quote", timer: "Focus timer", tasks: "Tasks", deadlines: "Deadlines", habits: "Habits",
+  water: "Water", calendar: "Calendar", days: "Day counter", notes: "Notes" };
+let hidden = load("hidden", []);
+const applyWidgets = () => document.querySelectorAll("[data-w]").forEach(n => { if (n.dataset.w in WIDGETS) n.hidden = hidden.includes(n.dataset.w); });
+
+function renderSettings() {
+  const img = storedImage();
+  const tiles = WALLS.map(([id, name]) => el("button", { className: "wp", textContent: name, ariaLabel: `${name} wallpaper`, onclick: () => setWall({ id }) }));
+  WALLS.forEach(([id], i) => { tiles[i].dataset.w = id; tiles[i].setAttribute("aria-pressed", wall.id === id); });
+  // the photo and link stay as tiles once added, so you can switch back to them
+  for (const [id, src, name] of [["upload", img, "Your photo"], ["url", wall.url, "Image link"]]) {
+    if (!src) continue;
+    const t = el("button", { className: "wp", textContent: name, ariaLabel: `${name} wallpaper`, onclick: () => setWall({ id }) });
+    t.style.cssText = `background-image:${cssUrl(src)};color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.5)`;
+    t.setAttribute("aria-pressed", wall.id === id);
+    tiles.push(t);
   }
-  if (b.id === "reset") { b.classList.remove("spin"); void b.offsetWidth; b.classList.add("spin"); }
-});
+  $("walls").replaceChildren(...tiles);
+  $("wallUrl").value = wall.url || "";
+  $("wallDim").value = wall.dim;
+  $("dimRow").hidden = root.dataset.wall !== "image";
+  document.querySelectorAll("#themeSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.t === (root.dataset.theme || "")));
+  $("widgetToggles").replaceChildren(...Object.entries(WIDGETS).map(([id, name]) => el("label", {}, name,
+    el("input", { type: "checkbox", checked: !hidden.includes(id), onchange: e => {
+      hidden = e.target.checked ? hidden.filter(x => x !== id) : [...hidden, id];
+      save("hidden", hidden); applyWidgets();
+    } }))));
+}
+applyWallpaper(); applyWidgets();
 
 /* ---------- start ---------- */
 function renderAll() {
-  showQuote(dailyQuote(), quoteIdx !== null);
+  showQuote(dailyQuote());
   renderStats(); renderTasks(); renderHabits(); renderCountdowns(); renderWater(); renderDays();
 }
 tickClock();
