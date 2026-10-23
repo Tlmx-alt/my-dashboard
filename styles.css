@@ -68,7 +68,27 @@
   /* three columns with the focus timer in the middle; one column (timer first) when there's no room */
   .wrap { container-type: inline-size; }
   .grid { display: grid; grid-template-columns: 1fr 1.1fr 1fr; gap: 16px; align-items: start; }
-  .col { display: grid; gap: 16px; min-width: 0; }
+  .zone { display: grid; gap: 16px; min-width: 0; align-content: start; }
+  /* full-width areas above and below the columns: cards sit side by side, the calendar takes the whole row */
+  .zone-wide { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+  .zone-wide > .c-cal, .zone-wide > .drop-slot.full { grid-column: 1 / -1; }
+  .zone-wide[data-zone="top"]:has(> .card:not([hidden]), > .drop-slot) { margin-bottom: 16px; }
+  .zone-wide[data-zone="bottom"]:has(> .card:not([hidden]), > .drop-slot) { margin-top: 16px; }
+
+  /* dragging cards around */
+  .card { position: relative; }
+  .grip { position: absolute; top: 3px; left: 50%; z-index: 1; width: 48px; height: 18px; margin-left: -24px; border-radius: 99px;
+    display: grid; place-items: center; cursor: grab; touch-action: none; opacity: 0; transition: opacity .15s; }
+  .grip::before { content: ""; width: 30px; height: 4px; border-radius: 99px; background: var(--muted); opacity: .55; }
+  .grip:hover::before { opacity: 1; }
+  .card:hover > .grip, .grip:focus-visible { opacity: 1; }
+  @media (hover: none) { .grip { opacity: .8; } }
+  .card.dragging { position: fixed; z-index: 30; margin: 0; box-shadow: 0 24px 60px -12px rgba(0,0,0,.35); cursor: grabbing; }
+  .card.dragging > .grip { cursor: grabbing; opacity: 1; }
+  .drop-slot { border: 2px dashed color-mix(in srgb, var(--fg) 25%, transparent); border-radius: var(--radius); background: color-mix(in srgb, var(--card) 45%, transparent); }
+  body.arranging { user-select: none; -webkit-user-select: none; cursor: grabbing; }
+  body.arranging .zone { min-height: 72px; border-radius: var(--radius); outline: 1.5px dashed color-mix(in srgb, var(--on-wall) 22%, transparent); outline-offset: 6px; }
+  body.arranging .zone-wide { margin: 16px 0; }
   @container (max-width: 860px) {
     .grid { grid-template-columns: minmax(0, 1fr); }
     .col-mid { order: -1; }
@@ -193,7 +213,7 @@
   .quick button { flex: 1; height: 32px; border-radius: 9px; background: var(--track); font-size: 12px; font-weight: 600; font-family: var(--num); font-variant-numeric: tabular-nums; }
 
   /* calendar: a full-width month with deadlines written in each day */
-  .c-cal { margin-top: 16px; padding: 22px; }
+  .c-cal { padding: 22px; container-type: inline-size; }  /* compact when dropped somewhere narrow */
   .c-cal .card-h h2 { font-size: 18px; }
   .cal-nav { display: flex; align-items: center; gap: 2px; }
   .cal { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
@@ -213,8 +233,7 @@
   .cal-key i { width: 10px; height: 10px; border-radius: 3px; }
   .cal-key span i:last-of-type { margin-right: 3px; }
   .cal-key .dl { background: color-mix(in srgb, #e8892b 40%, transparent); }
-  @container (max-width: 640px) {
-    .c-cal { padding: 16px; }
+  @container (max-width: 600px) {
     .cal { gap: 3px; }
     .cal .dow { padding: 0; text-align: center; }
     .cal .day { min-height: 46px; padding: 4px; align-items: center; }

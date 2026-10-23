@@ -66,8 +66,10 @@ try {
     </figure>
   </header>
 
+  <div class="zone zone-wide" data-zone="top"></div>
+
   <main class="grid">
-    <div class="col col-left">
+    <div class="zone col col-left" data-zone="left">
       <!-- Tasks -->
       <section class="card c-tasks" data-w="tasks" aria-label="Tasks">
         <div class="card-h"><h2>Tasks</h2><span class="meta"><span id="taskmeta"></span> <button class="link-btn" id="clearDone">Clear done</button></span></div>
@@ -90,7 +92,7 @@ try {
       </section>
     </div>
 
-    <div class="col col-mid">
+    <div class="zone col col-mid" data-zone="mid">
       <!-- Timer + today's focus -->
       <section class="card c-timer" data-w="timer" aria-label="Focus timer">
         <div class="tabs" id="tabs" role="tablist">
@@ -141,7 +143,7 @@ try {
       </section>
     </div>
 
-    <div class="col col-right">
+    <div class="zone col col-right" data-zone="right">
       <!-- Water -->
       <section class="card c-water" data-w="water" aria-label="Water tracker">
         <div class="card-h"><h2>Water</h2><span class="meta">goal <input type="number" id="wgoal" min="250" max="10000" step="50" aria-label="Water goal in millilitres"> ml</span></div>
@@ -179,13 +181,15 @@ try {
     </div>
   </main>
 
-  <!-- Calendar: full width under the columns -->
+  <!-- full-width area under the columns; cards can also be dragged here or above the columns -->
+  <div class="zone zone-wide" data-zone="bottom">
   <section class="card c-cal" data-w="calendar" aria-label="Focus calendar">
     <div class="card-h"><h2 id="calTitle"></h2>
       <span class="cal-nav"><button class="link-btn" id="calToday">Today</button><button class="icon-btn" id="calPrev" aria-label="Previous month"><svg class="ico"><use href="#i-left"/></svg></button><button class="icon-btn" id="calNext" aria-label="Next month"><svg class="ico"><use href="#i-right"/></svg></button></span></div>
     <div class="cal" id="cal"></div>
     <div class="cal-key" aria-hidden="true"><span><i class="lv1"></i><i class="lv2"></i><i class="lv3"></i> Focus sessions</span><span><i class="dl"></i> Deadline</span></div>
   </section>
+  </div>
 </div>
 
 <!-- Customize panel -->
@@ -228,6 +232,7 @@ try {
     <section>
       <h3>Show on dashboard</h3>
       <div class="toggles" id="widgetToggles"></div>
+      <button class="link-btn" id="resetLayout">Reset layout</button>
     </section>
 
     <p class="sync" id="sync"><i></i><span></span></p>

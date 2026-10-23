@@ -13,6 +13,13 @@ Click the sliders button in the top-right corner to:
 - **Switch theme**: Auto (follows your system), Light or Dark.
 - **Show or hide widgets**: turn off anything you don't use to keep the page simple.
 
+## Arrange the cards
+
+Grab the small handle on the top edge of any card (it appears when you hover) and drag it into any
+column, or into the full-width areas above or below the columns. Your layout is saved. You can also
+focus a handle and use the arrow keys: up and down within a column, left and right to the next area.
+Press Escape while dragging to cancel, and use **Customize → Reset layout** to go back to the default.
+
 ## Stocks and news
 
 Click the chart button in the top-left corner to open the **Markets** sidebar, and the arrow inside it to

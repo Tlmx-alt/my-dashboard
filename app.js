@@ -804,6 +804,105 @@ function renderSettings() {
 }
 applyWallpaper(); applyWidgets();
 
+/* ---------- arrange: drag cards by the handle on their top edge into any column or the wide areas ---------- */
+const ZONES = [...document.querySelectorAll("[data-zone]")];
+const layoutNow = () => Object.fromEntries(ZONES.map(z => [z.dataset.zone, [...z.children].filter(c => c.dataset.w).map(c => c.dataset.w)]));
+function applyLayout(lay) {
+  for (const z of ZONES) for (const id of lay[z.dataset.zone] || []) {
+    const card = document.querySelector(`.card[data-w="${id}"]`);
+    if (card) z.append(card);
+  }
+}
+const DEFAULT_LAYOUT = layoutNow();
+const savedLayout = load("layout", null);
+if (savedLayout) applyLayout(savedLayout);  // cards added in later versions stay where index.html puts them
+$("resetLayout").onclick = () => { applyLayout(DEFAULT_LAYOUT); save("layout", null); };
+document.querySelectorAll(".card[data-w]").forEach(card => card.prepend(
+  el("button", { className: "grip", ariaLabel: `Move ${WIDGETS[card.dataset.w] || "card"}. Drag, or use the arrow keys`, title: "Drag to move" })));
+
+let drag = null;
+document.addEventListener("pointerdown", e => {
+  const grip = e.target.closest(".grip");
+  if (!grip || e.button !== 0 || drag) return;
+  e.preventDefault();
+  const card = grip.parentElement, r = card.getBoundingClientRect();
+  const slot = el("div", { className: "drop-slot" + (card.classList.contains("c-cal") ? " full" : "") });
+  slot.style.height = r.height + "px";
+  drag = { card, slot, id: e.pointerId, dx: e.clientX - r.left, dy: e.clientY - r.top, x: e.clientX, y: e.clientY, home: [card.parentElement, card.nextElementSibling] };
+  card.after(slot);
+  Object.assign(card.style, { width: r.width + "px", left: r.left + "px", top: r.top + "px" });
+  card.classList.add("dragging");
+  keepInPlace(slot, () => document.body.classList.add("arranging"));  // empty drop areas open up; don't let the page jump
+  grip.setPointerCapture(e.pointerId);
+  autoScroll();
+});
+document.addEventListener("pointermove", e => {
+  if (!drag || e.pointerId !== drag.id) return;
+  drag.x = e.clientX; drag.y = e.clientY;
+  drag.card.style.left = e.clientX - drag.dx + "px";
+  drag.card.style.top = e.clientY - drag.dy + "px";
+  placeSlot();
+});
+function placeSlot() {
+  const { x, y, card, slot } = drag;
+  let zone, best = Infinity;
+  for (const z of ZONES) {  // the area nearest the pointer
+    const r = z.getBoundingClientRect();
+    const dx = Math.max(r.left - x, 0, x - r.right), dy = Math.max(r.top - y, 0, y - r.bottom);
+    if (dx * dx + dy * dy < best) { best = dx * dx + dy * dy; zone = z; }
+  }
+  const zr = zone.getBoundingClientRect(), wide = zone.classList.contains("zone-wide");
+  const before = [...zone.children].find(c => {
+    if (c === card || c === slot || c.hidden) return false;
+    const r = c.getBoundingClientRect();
+    // columns stack top to bottom; the wide areas fill rows left to right
+    return !wide || r.width > zr.width * .9 ? y < r.top + r.height / 2 : y < r.top || (y <= r.bottom && x < r.left + r.width / 2);
+  });
+  if (before) { if (slot.nextElementSibling !== before) zone.insertBefore(slot, before); }
+  else if (zone.lastElementChild !== slot) zone.append(slot);
+}
+function keepInPlace(node, change) {  // make a layout change, then scroll so `node` stays where it was on screen
+  const y = node.getBoundingClientRect().top;
+  change();
+  scrollBy(0, node.getBoundingClientRect().top - y);
+}
+function autoScroll() {  // scroll while holding a card near the top or bottom of the window
+  if (!drag) return;
+  const edge = 70, v = drag.y < edge ? drag.y - edge : drag.y > innerHeight - edge ? drag.y - (innerHeight - edge) : 0;
+  if (v) { scrollBy(0, v / 4); placeSlot(); }
+  drag.raf = requestAnimationFrame(autoScroll);
+}
+function endDrag(cancel) {
+  const { card, slot, home, raf } = drag;
+  cancelAnimationFrame(raf);
+  if (cancel) { slot.remove(); home[0].insertBefore(card, home[1]); }
+  else slot.replaceWith(card);
+  card.classList.remove("dragging");
+  for (const k of ["width", "left", "top"]) card.style.removeProperty(k);
+  keepInPlace(card, () => document.body.classList.remove("arranging"));
+  drag = null;
+  if (!cancel) save("layout", layoutNow());
+}
+document.addEventListener("pointerup", e => { if (drag && e.pointerId === drag.id) endDrag(false); });
+document.addEventListener("pointercancel", e => { if (drag && e.pointerId === drag.id) endDrag(true); });
+document.addEventListener("keydown", e => {
+  if (drag) { if (e.key === "Escape") endDrag(true); return; }
+  // keyboard: up/down within an area, left/right to the previous/next area
+  const grip = e.target.closest && e.target.closest(".grip");
+  if (!grip || !/^Arrow(Up|Down|Left|Right)$/.test(e.key)) return;
+  e.preventDefault();
+  const card = grip.parentElement, zone = card.parentElement;
+  const sibs = [...zone.children].filter(c => !c.hidden), i = sibs.indexOf(card);
+  const order = ["top", "left", "mid", "right", "bottom"], zi = order.indexOf(zone.dataset.zone);
+  if (e.key === "ArrowUp" && i > 0) sibs[i - 1].before(card);
+  else if (e.key === "ArrowDown" && i < sibs.length - 1) sibs[i + 1].after(card);
+  else if (e.key === "ArrowLeft" && zi > 0) document.querySelector(`[data-zone="${order[zi - 1]}"]`).append(card);
+  else if (e.key === "ArrowRight" && zi < order.length - 1) document.querySelector(`[data-zone="${order[zi + 1]}"]`).append(card);
+  else return;
+  grip.focus();
+  save("layout", layoutNow());
+});
+
 /* ---------- start ---------- */
 function renderAll() {
   showQuote(dailyQuote());
