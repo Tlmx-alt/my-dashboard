@@ -341,20 +341,25 @@ function renderCalendar() {
   const now = new Date(), first = new Date(now.getFullYear(), now.getMonth() + calOff, 1);
   $("calTitle").textContent = first.toLocaleDateString([], { month: "long", year: "numeric" });
   const dim = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
-  const deadlineDays = new Set(cds.map(c => c.date));
-  const heads = ["S", "M", "T", "W", "T", "F", "S"].map(d => el("span", { className: "dow", textContent: d }));
-  const cells = [...Array(first.getDay())].map(() => el("span"));
+  const heads = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(d => el("span", { className: "dow", textContent: d }));
+  const cells = [...Array(first.getDay())].map(() => el("span", { className: "day blank" }));
   for (let d = 1; d <= dim; d++) {
     const dt = new Date(first.getFullYear(), first.getMonth(), d), k = dayKey(dt), n = log[k] || 0;
     const lv = n === 0 ? 0 : n >= cfg.goal ? 3 : n >= cfg.goal / 2 ? 2 : 1;
-    const due = cds.filter(c => c.date === k).map(c => c.name);
-    cells.push(el("span", { className: `day lv${lv}` + (k === dayKey() ? " today" : "") + (deadlineDays.has(k) ? " due" : ""), textContent: d,
-      title: `${dt.toLocaleDateString([], { month: "short", day: "numeric" })}: ${n} session${n === 1 ? "" : "s"}` + (due.length ? ` · ${due.join(", ")}` : "") }));
+    const due = cds.filter(c => c.date === k).sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+    cells.push(el("div", { className: `day lv${lv}` + (k === dayKey() ? " today" : "") + (due.length ? " due" : ""),
+      title: `${dt.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })}: ${n} focus session${n === 1 ? "" : "s"}` + (due.length ? ` · ${due.map(c => c.name).join(", ")}` : "") },
+      el("span", { className: "n", textContent: d }),
+      ...due.slice(0, 2).map(c => el("span", { className: "ev", textContent: (c.time ? new Date(k + "T" + c.time).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) + " " : "") + c.name })),
+      due.length > 2 ? el("span", { className: "more", textContent: `+${due.length - 2} more` }) : "",
+      n ? el("span", { className: "sess", textContent: `${n} focus` }) : ""));
   }
   $("cal").replaceChildren(...heads, ...cells);
+  $("calToday").hidden = calOff === 0;
 }
 $("calPrev").onclick = () => { calOff--; renderCalendar(); };
 $("calNext").onclick = () => { calOff++; renderCalendar(); };
+$("calToday").onclick = () => { calOff = 0; renderCalendar(); };
 
 /* ---------- deadlines: type it in plain words ---------- */
 let cds = load("countdowns", []);
@@ -555,7 +560,21 @@ const FH = "https://finnhub.io/api/v1/";
 let fhKey = load("finnhubKey", "");
 let watch = load("watchlist", ["AAPL", "MSFT", "GOOGL"]);
 let quotes = {}, quotesAt = 0, news = [], newsAt = 0, newsFor = null;  // newsFor: a ticker, or null for market news
-const isShown = w => !hidden.includes(w);
+// the sidebar on the left: open or closed is remembered, and nothing is fetched while it's closed
+const html = document.documentElement;
+const marketsOpen = () => html.dataset.markets === "open";
+function setMarketsOpen(open) {
+  if (open) html.dataset.markets = "open"; else delete html.dataset.markets;
+  $("openMarkets").setAttribute("aria-expanded", open);
+  save("marketsOpen", open);
+  if (open) { refreshMarkets(); $("closeMarkets").focus({ preventScroll: true }); }
+  else $("openMarkets").focus({ preventScroll: true });
+}
+$("openMarkets").onclick = () => setMarketsOpen(true);
+$("closeMarkets").onclick = () => setMarketsOpen(false);
+$("markets").addEventListener("keydown", e => { if (e.key === "Escape") setMarketsOpen(false); });
+if (load("marketsOpen", false)) html.dataset.markets = "open"; else delete html.dataset.markets;  // data.json wins over the early guess in index.html
+$("openMarkets").setAttribute("aria-expanded", marketsOpen());
 async function fh(path, params = {}, key = fhKey) {
   let r;
   try { r = await fetch(FH + path + "?" + new URLSearchParams({ ...params, token: key })); }
@@ -571,7 +590,7 @@ const price = n => n.toLocaleString(undefined, { minimumFractionDigits: 2, maxim
 const ago = sec => { const m = Math.max(1, Math.round((Date.now() / 1000 - sec) / 60)); return m < 60 ? m + "m ago" : m < 1440 ? Math.round(m / 60) + "h ago" : Math.round(m / 1440) + "d ago"; };
 
 async function refreshQuotes() {
-  if (!fhKey || !isShown("stocks") || !watch.length) return renderStocks();
+  if (!fhKey || !marketsOpen() || !watch.length) return renderStocks();
   quotesAt = Date.now();
   const syms = [...watch];
   const res = await Promise.allSettled(syms.map(symbol => fh("quote", { symbol })));
@@ -582,8 +601,8 @@ async function refreshQuotes() {
   renderStocks();
 }
 function renderStocks() {
-  $("stocksSetup").hidden = !!fhKey;
-  $("stocksMain").hidden = $("stocksRefresh").hidden = $("stocksAt").hidden = !fhKey;
+  $("marketsSetup").hidden = !!fhKey;
+  $("stocksMain").hidden = $("newsMain").hidden = $("stocksRefresh").hidden = $("stocksAt").hidden = !fhKey;
   $("stocks").replaceChildren(...(watch.length ? watch.map(sym => {
     const q = quotes[sym];
     const symBtn = el("button", { className: "sym", textContent: sym, title: `Show ${sym} news`, onclick: () => setNewsFor(newsFor === sym ? null : sym) });
@@ -622,7 +641,7 @@ $("stockForm").onsubmit = async e => {
 };
 
 async function refreshNews() {
-  if (!fhKey || !isShown("news")) return renderNews();
+  if (!fhKey || !marketsOpen()) return renderNews();
   newsAt = Date.now();
   const forSym = newsFor;
   try {
@@ -644,7 +663,6 @@ async function refreshNews() {
 }
 function setNewsFor(sym) { newsFor = sym; news = null; renderStocks(); renderNews(); refreshNews(); }
 function renderNews() {
-  $("newsSetup").hidden = !!fhKey;
   $("newsFilter").replaceChildren(!fhKey ? "" : newsFor
     ? el("button", { className: "chip", ariaLabel: `Showing ${newsFor} news. Show market news instead`, title: "Back to market news", onclick: () => setNewsFor(null) }, newsFor, icon("x"))
     : "Market");
@@ -754,7 +772,7 @@ const savedTheme = load("theme", null);
 if (savedTheme) root.dataset.theme = savedTheme;
 
 // widgets you can hide
-const WIDGETS = { quote: "Quote", timer: "Focus timer", tasks: "Tasks", stocks: "Stocks", news: "News", deadlines: "Deadlines", habits: "Habits",
+const WIDGETS = { quote: "Quote", timer: "Focus timer", tasks: "Tasks", deadlines: "Deadlines", habits: "Habits",
   water: "Water", calendar: "Calendar", days: "Day counter", notes: "Notes" };
 let hidden = load("hidden", []);
 const applyWidgets = () => document.querySelectorAll("[data-w]").forEach(n => { if (n.dataset.w in WIDGETS) n.hidden = hidden.includes(n.dataset.w); });
@@ -779,7 +797,7 @@ function renderSettings() {
   $("widgetToggles").replaceChildren(...Object.entries(WIDGETS).map(([id, name]) => el("label", {}, name,
     el("input", { type: "checkbox", checked: !hidden.includes(id), onchange: e => {
       hidden = e.target.checked ? hidden.filter(x => x !== id) : [...hidden, id];
-      save("hidden", hidden); applyWidgets(); refreshMarkets();
+      save("hidden", hidden); applyWidgets();
     } }))));
   $("fhKey").placeholder = fhKey ? `Key saved (…${fhKey.slice(-4)}). Paste to replace` : "Finnhub API key";
   $("fhRemove").hidden = !fhKey;

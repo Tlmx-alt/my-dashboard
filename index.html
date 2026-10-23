@@ -9,6 +9,7 @@
 try {
   const r = document.documentElement, get = k => JSON.parse(localStorage.getItem(k));
   const t = get("dash-theme"); if (t) r.dataset.theme = t;
+  if (get("dash-marketsOpen")) r.dataset.markets = "open";
   const w = get("dash-wallpaper");
   if (w && w.id) {
     const src = w.id === "upload" ? localStorage.getItem("wallpaper-image") : w.id === "url" ? w.url : null;
@@ -22,6 +23,37 @@ try {
 <body>
 <div class="wall" aria-hidden="true"></div>
 <button class="icon-btn corner" id="openSettings" aria-label="Customize" title="Customize"><svg class="ico"><use href="#i-sliders"/></svg></button>
+<button class="icon-btn corner left" id="openMarkets" aria-label="Show stocks and news" title="Stocks & news" aria-controls="markets" aria-expanded="false"><svg class="ico"><use href="#i-trend"/></svg></button>
+
+<!-- Stocks + news: a sidebar on the left you can open and close -->
+<aside class="markets" id="markets" aria-label="Stocks and news">
+  <div class="markets-h">
+    <h2>Markets</h2>
+    <span class="meta"><span id="stocksAt"></span><button class="icon-btn" id="stocksRefresh" aria-label="Refresh prices and news" title="Refresh"><svg class="ico"><use href="#i-refresh"/></svg></button></span>
+    <button class="icon-btn" id="closeMarkets" aria-label="Close stocks and news" title="Close"><svg class="ico"><use href="#i-left"/></svg></button>
+  </div>
+
+  <div class="setup" id="marketsSetup">
+    Follow prices for the stocks you care about, plus market headlines.
+    <button class="btn" data-setup>Connect a free Finnhub key</button>
+  </div>
+
+  <section class="m-sec" id="stocksMain" aria-label="Stocks">
+    <h3>Stocks</h3>
+    <form class="add" id="stockForm">
+      <input type="text" id="stockInput" placeholder="Add a ticker, e.g. AAPL" maxlength="20" aria-label="Add a stock ticker" autocomplete="off" spellcheck="false">
+      <button aria-label="Add stock"><svg class="ico"><use href="#i-plus"/></svg></button>
+    </form>
+    <ul id="stocks"></ul>
+    <p class="msg" id="stocksMsg" aria-live="polite"></p>
+  </section>
+
+  <section class="m-sec" id="newsMain" aria-label="News">
+    <div class="m-sec-h"><h3>News</h3><span class="meta" id="newsFilter"></span></div>
+    <ul id="news"></ul>
+    <p class="msg" id="newsMsg" aria-live="polite"></p>
+  </section>
+</aside>
 
 <div class="wrap">
   <header class="hero">
@@ -35,146 +67,125 @@ try {
   </header>
 
   <main class="grid">
-    <!-- Timer + today's focus -->
-    <section class="card c-timer" data-w="timer" aria-label="Focus timer">
-      <div class="tabs" id="tabs" role="tablist">
-        <button data-mode="focus" class="active">Focus</button>
-        <button data-mode="short">Short break</button>
-        <button data-mode="long">Long break</button>
-      </div>
-      <div class="ring" id="ring">
-        <svg viewBox="0 0 260 260" aria-hidden="true">
-          <circle class="bg" cx="130" cy="130" r="120"/>
-          <circle class="fg" id="arc" cx="130" cy="130" r="120"/>
-        </svg>
-        <div class="time" role="timer"><b id="clock">25:00</b><small id="label">Time to focus</small></div>
-      </div>
-      <div class="controls">
-        <button class="round" id="reset" aria-label="Reset timer"><svg class="ico"><use href="#i-reset"/></svg></button>
-        <button class="primary" id="toggle"><svg class="ico"><use href="#i-play"/></svg><span>Start</span></button>
-        <button class="round" id="skip" aria-label="Skip to next"><svg class="ico"><use href="#i-skip"/></svg></button>
-      </div>
-      <div class="dots" id="dots" aria-hidden="true"></div>
-      <div class="upnext" id="upnext"></div>
-      <div class="focus-stats">
-        <div><b id="st-sessions">0</b><span>sessions</span></div>
-        <div><b id="st-minutes">0</b><span>minutes</span></div>
-        <div><b id="st-streak">0</b><span>day streak</span></div>
-      </div>
-      <div class="bar" title="Daily goal"><i id="goalbar"></i></div>
-      <details>
-        <summary>Timer settings</summary>
-        <div class="settings">
-          <label>Focus (min)<input type="number" id="s-focus" min="1" max="120"></label>
-          <label>Short (min)<input type="number" id="s-short" min="1" max="60"></label>
-          <label>Long (min)<input type="number" id="s-long" min="1" max="60"></label>
-          <label>Daily goal<input type="number" id="goal" min="1" max="30" aria-label="Daily session goal"></label>
-        </div>
-        <div class="colors" id="colors"></div>
-      </details>
-    </section>
-
-    <!-- Tasks -->
-    <section class="card c-tasks" data-w="tasks" aria-label="Tasks">
-      <div class="card-h"><h2>Tasks</h2><span class="meta"><span id="taskmeta"></span> <button class="link-btn" id="clearDone">Clear done</button></span></div>
-      <form class="add" id="taskForm">
-        <input type="text" id="taskInput" placeholder="What are you working on?" maxlength="120" aria-label="New task" autocomplete="off">
-        <button aria-label="Add task"><svg class="ico"><use href="#i-plus"/></svg></button>
-      </form>
-      <ul id="tasks"></ul>
-    </section>
-
-    <!-- Stocks -->
-    <section class="card c-stocks" data-w="stocks" aria-label="Stocks">
-      <div class="card-h"><h2>Stocks</h2><span class="meta"><span id="stocksAt"></span><button class="icon-btn" id="stocksRefresh" aria-label="Refresh prices and news" title="Refresh"><svg class="ico"><use href="#i-refresh"/></svg></button></span></div>
-      <div class="setup" id="stocksSetup">
-        Follow live prices for the stocks you care about.
-        <button class="btn" data-setup>Connect a free Finnhub key</button>
-      </div>
-      <div id="stocksMain">
-        <form class="add" id="stockForm">
-          <input type="text" id="stockInput" placeholder="Add a ticker, e.g. AAPL" maxlength="20" aria-label="Add a stock ticker" autocomplete="off" spellcheck="false">
-          <button aria-label="Add stock"><svg class="ico"><use href="#i-plus"/></svg></button>
+    <div class="col col-left">
+      <!-- Tasks -->
+      <section class="card c-tasks" data-w="tasks" aria-label="Tasks">
+        <div class="card-h"><h2>Tasks</h2><span class="meta"><span id="taskmeta"></span> <button class="link-btn" id="clearDone">Clear done</button></span></div>
+        <form class="add" id="taskForm">
+          <input type="text" id="taskInput" placeholder="What are you working on?" maxlength="120" aria-label="New task" autocomplete="off">
+          <button aria-label="Add task"><svg class="ico"><use href="#i-plus"/></svg></button>
         </form>
-        <ul id="stocks"></ul>
-      </div>
-      <p class="msg" id="stocksMsg" aria-live="polite"></p>
-    </section>
+        <ul id="tasks"></ul>
+      </section>
 
-    <!-- News -->
-    <section class="card c-news" data-w="news" aria-label="News">
-      <div class="card-h"><h2>News</h2><span class="meta" id="newsFilter"></span></div>
-      <div class="setup" id="newsSetup">
-        Market headlines, or news for one of your stocks.
-        <button class="btn" data-setup>Connect a free Finnhub key</button>
-      </div>
-      <ul id="news"></ul>
-      <p class="msg" id="newsMsg" aria-live="polite"></p>
-    </section>
+      <!-- Deadlines -->
+      <section class="card c-cd" data-w="deadlines" aria-label="Deadlines">
+        <div class="card-h"><h2>Deadlines</h2></div>
+        <form class="add" id="cdForm">
+          <input type="text" id="cdText" placeholder="e.g. VAT return due next Thursday" maxlength="160" aria-label="Describe the event and when it is" autocomplete="off">
+          <button aria-label="Add deadline"><svg class="ico"><use href="#i-plus"/></svg></button>
+        </form>
+        <div class="cd-hint" id="cdHint" aria-live="polite"></div>
+        <ul id="cds"></ul>
+      </section>
+    </div>
 
-    <!-- Deadlines -->
-    <section class="card c-cd" data-w="deadlines" aria-label="Deadlines">
-      <div class="card-h"><h2>Deadlines</h2></div>
-      <form class="add" id="cdForm">
-        <input type="text" id="cdText" placeholder="e.g. VAT return due next Thursday" maxlength="160" aria-label="Describe the event and when it is" autocomplete="off">
-        <button aria-label="Add deadline"><svg class="ico"><use href="#i-plus"/></svg></button>
-      </form>
-      <div class="cd-hint" id="cdHint" aria-live="polite"></div>
-      <ul id="cds"></ul>
-    </section>
-
-    <!-- Habits -->
-    <section class="card c-habits" data-w="habits" aria-label="Habits">
-      <div class="card-h"><h2>Habits</h2><span class="meta" id="habitmeta"></span></div>
-      <form class="add" id="habitForm">
-        <input type="text" id="habitInput" placeholder="New habit" maxlength="40" aria-label="New habit" autocomplete="off">
-        <button aria-label="Add habit"><svg class="ico"><use href="#i-plus"/></svg></button>
-      </form>
-      <ul id="habits"></ul>
-    </section>
-
-    <!-- Water -->
-    <section class="card c-water" data-w="water" aria-label="Water tracker">
-      <div class="card-h"><h2>Water</h2><span class="meta">goal <input type="number" id="wgoal" min="250" max="10000" step="50" aria-label="Water goal in millilitres"> ml</span></div>
-      <div class="water-row">
-        <div class="big"><span id="wcount">0</span> <small>ml</small></div>
-        <div class="stepper">
-          <button id="wminus" aria-label="Remove 250 ml"><svg class="ico"><use href="#i-minus"/></svg></button>
-          <button id="wplus" class="plus" aria-label="Add 250 ml"><svg class="ico"><use href="#i-plus"/></svg></button>
+    <div class="col col-mid">
+      <!-- Timer + today's focus -->
+      <section class="card c-timer" data-w="timer" aria-label="Focus timer">
+        <div class="tabs" id="tabs" role="tablist">
+          <button data-mode="focus" class="active">Focus</button>
+          <button data-mode="short">Short break</button>
+          <button data-mode="long">Long break</button>
         </div>
-      </div>
-      <div class="bar"><i id="wbar"></i></div>
-      <div class="quick" aria-label="Quick add"><button data-ml="150">+150</button><button data-ml="330">+330</button><button data-ml="500">+500</button></div>
-    </section>
+        <div class="ring" id="ring">
+          <svg viewBox="0 0 260 260" aria-hidden="true">
+            <circle class="bg" cx="130" cy="130" r="120"/>
+            <circle class="fg" id="arc" cx="130" cy="130" r="120"/>
+          </svg>
+          <div class="time" role="timer"><b id="clock">25:00</b><small id="label">Time to focus</small></div>
+        </div>
+        <div class="controls">
+          <button class="round" id="reset" aria-label="Reset timer"><svg class="ico"><use href="#i-reset"/></svg></button>
+          <button class="primary" id="toggle"><svg class="ico"><use href="#i-play"/></svg><span>Start</span></button>
+          <button class="round" id="skip" aria-label="Skip to next"><svg class="ico"><use href="#i-skip"/></svg></button>
+        </div>
+        <div class="dots" id="dots" aria-hidden="true"></div>
+        <div class="upnext" id="upnext"></div>
+        <div class="focus-stats">
+          <div><b id="st-sessions">0</b><span>sessions</span></div>
+          <div><b id="st-minutes">0</b><span>minutes</span></div>
+          <div><b id="st-streak">0</b><span>day streak</span></div>
+        </div>
+        <div class="bar" title="Daily goal"><i id="goalbar"></i></div>
+        <details>
+          <summary>Timer settings</summary>
+          <div class="settings">
+            <label>Focus (min)<input type="number" id="s-focus" min="1" max="120"></label>
+            <label>Short (min)<input type="number" id="s-short" min="1" max="60"></label>
+            <label>Long (min)<input type="number" id="s-long" min="1" max="60"></label>
+            <label>Daily goal<input type="number" id="goal" min="1" max="30" aria-label="Daily session goal"></label>
+          </div>
+          <div class="colors" id="colors"></div>
+        </details>
+      </section>
 
-    <!-- Calendar -->
-    <section class="card c-cal" data-w="calendar" aria-label="Focus calendar">
-      <div class="card-h"><h2 id="calTitle"></h2>
-        <span class="cal-nav"><button class="icon-btn" id="calPrev" aria-label="Previous month"><svg class="ico"><use href="#i-left"/></svg></button><button class="icon-btn" id="calNext" aria-label="Next month"><svg class="ico"><use href="#i-right"/></svg></button></span></div>
-      <div class="cal" id="cal"></div>
-    </section>
+      <!-- Habits -->
+      <section class="card c-habits" data-w="habits" aria-label="Habits">
+        <div class="card-h"><h2>Habits</h2><span class="meta" id="habitmeta"></span></div>
+        <form class="add" id="habitForm">
+          <input type="text" id="habitInput" placeholder="New habit" maxlength="40" aria-label="New habit" autocomplete="off">
+          <button aria-label="Add habit"><svg class="ico"><use href="#i-plus"/></svg></button>
+        </form>
+        <ul id="habits"></ul>
+      </section>
+    </div>
 
-    <!-- Day counter -->
-    <section class="card c-days" data-w="days" aria-label="Day counter">
-      <div class="card-h"><h2>Day counter</h2><span class="meta" id="yearleft"></span></div>
-      <div class="year">
-        <div class="year-n"><span id="yearday">0</span><small id="yeartotal"></small></div>
-        <div class="bar"><i id="yearbar"></i></div>
-      </div>
-      <form class="add days-form" id="dcForm">
-        <input type="text" id="dcName" placeholder="Days since… or until…" maxlength="40" aria-label="What are you counting" autocomplete="off">
-        <input type="date" id="dcDate" aria-label="Start or target date" required>
-        <button aria-label="Add counter"><svg class="ico"><use href="#i-plus"/></svg></button>
-      </form>
-      <ul id="dcs"></ul>
-    </section>
+    <div class="col col-right">
+      <!-- Water -->
+      <section class="card c-water" data-w="water" aria-label="Water tracker">
+        <div class="card-h"><h2>Water</h2><span class="meta">goal <input type="number" id="wgoal" min="250" max="10000" step="50" aria-label="Water goal in millilitres"> ml</span></div>
+        <div class="water-row">
+          <div class="big"><span id="wcount">0</span> <small>ml</small></div>
+          <div class="stepper">
+            <button id="wminus" aria-label="Remove 250 ml"><svg class="ico"><use href="#i-minus"/></svg></button>
+            <button id="wplus" class="plus" aria-label="Add 250 ml"><svg class="ico"><use href="#i-plus"/></svg></button>
+          </div>
+        </div>
+        <div class="bar"><i id="wbar"></i></div>
+        <div class="quick" aria-label="Quick add"><button data-ml="150">+150</button><button data-ml="330">+330</button><button data-ml="500">+500</button></div>
+      </section>
 
-    <!-- Notes -->
-    <section class="card c-notes" data-w="notes" aria-label="Notes">
-      <div class="card-h"><h2>Notes</h2><span class="meta" id="saved"></span></div>
-      <textarea id="notes" placeholder="Jot something down…" aria-label="Notes"></textarea>
-    </section>
+      <!-- Day counter -->
+      <section class="card c-days" data-w="days" aria-label="Day counter">
+        <div class="card-h"><h2>Day counter</h2><span class="meta" id="yearleft"></span></div>
+        <div class="year">
+          <div class="year-n"><span id="yearday">0</span><small id="yeartotal"></small></div>
+          <div class="bar"><i id="yearbar"></i></div>
+        </div>
+        <form class="add days-form" id="dcForm">
+          <input type="text" id="dcName" placeholder="Days since… or until…" maxlength="40" aria-label="What are you counting" autocomplete="off">
+          <input type="date" id="dcDate" aria-label="Start or target date" required>
+          <button aria-label="Add counter"><svg class="ico"><use href="#i-plus"/></svg></button>
+        </form>
+        <ul id="dcs"></ul>
+      </section>
+
+      <!-- Notes -->
+      <section class="card c-notes" data-w="notes" aria-label="Notes">
+        <div class="card-h"><h2>Notes</h2><span class="meta" id="saved"></span></div>
+        <textarea id="notes" placeholder="Jot something down…" aria-label="Notes"></textarea>
+      </section>
+    </div>
   </main>
+
+  <!-- Calendar: full width under the columns -->
+  <section class="card c-cal" data-w="calendar" aria-label="Focus calendar">
+    <div class="card-h"><h2 id="calTitle"></h2>
+      <span class="cal-nav"><button class="link-btn" id="calToday">Today</button><button class="icon-btn" id="calPrev" aria-label="Previous month"><svg class="ico"><use href="#i-left"/></svg></button><button class="icon-btn" id="calNext" aria-label="Next month"><svg class="ico"><use href="#i-right"/></svg></button></span></div>
+    <div class="cal" id="cal"></div>
+    <div class="cal-key" aria-hidden="true"><span><i class="lv1"></i><i class="lv2"></i><i class="lv3"></i> Focus sessions</span><span><i class="dl"></i> Deadline</span></div>
+  </section>
 </div>
 
 <!-- Customize panel -->
@@ -237,6 +248,7 @@ try {
   <symbol id="i-flame" viewBox="0 0 24 24"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.4-.5-2-1-3-1.1-2.1-.2-4 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.2.4-2.4 1-3 0 1.4 1 2.5 2.5 2.5z"/></symbol>
   <symbol id="i-refresh" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.5 15a9 9 0 1 1-2.1-9.4L23 10"/></symbol>
   <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h3M11 7h9M4 17h9M17 17h3"/><circle cx="9" cy="7" r="2"/><circle cx="15" cy="17" r="2"/></symbol>
+  <symbol id="i-trend" viewBox="0 0 24 24"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/></symbol>
   <symbol id="i-x" viewBox="0 0 24 24"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></symbol>
   <symbol id="i-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></symbol>
 </svg>

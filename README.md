@@ -15,12 +15,17 @@ Click the sliders button in the top-right corner to:
 
 ## Stocks and news
 
-The Stocks and News cards use [Finnhub](https://finnhub.io). Sign up for a free API key at
+Click the chart button in the top-left corner to open the **Markets** sidebar, and the arrow inside it to
+close it. On a wide screen the dashboard moves over to make room; on a phone the sidebar slides over it.
+The sidebar remembers whether it was open.
+
+Prices and headlines come from [Finnhub](https://finnhub.io). Sign up for a free API key at
 https://finnhub.io/register, then paste it under **Customize → Stocks & news**.
 
-- Add tickers like `AAPL` or `BRK.B` to the Stocks card. Prices refresh every minute while the page is open.
-- The News card shows market headlines. Click a ticker to see that company's news from the last week,
-  and click the ticker chip in the News card to go back.
+- Add tickers like `AAPL` or `BRK.B`. Prices refresh every minute while the sidebar is open; nothing is
+  fetched while it's closed.
+- News shows market headlines. Click a ticker to see that company's news from the last week, and click
+  the ticker chip next to "News" to go back.
 - The free plan mainly covers US-listed stocks; tickers outside it show "Not on free plan".
 - Your key is saved with the rest of your data (browser storage, and `data.json` when using the server).
 
