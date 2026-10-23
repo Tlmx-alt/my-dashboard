@@ -816,7 +816,11 @@ function applyLayout(lay) {
 const DEFAULT_LAYOUT = layoutNow();
 const savedLayout = load("layout", null);
 if (savedLayout) applyLayout(savedLayout);  // cards added in later versions stay where index.html puts them
-$("resetLayout").onclick = () => { applyLayout(DEFAULT_LAYOUT); save("layout", null); };
+$("resetLayout").onclick = () => {
+  applyLayout(DEFAULT_LAYOUT); save("layout", null);
+  sizes = {}; cols = null; save("sizes", null); save("cols", null);
+  applyCols(); document.querySelectorAll(".card[data-w]").forEach(applySize);
+};
 document.querySelectorAll(".card[data-w]").forEach(card => card.prepend(
   el("button", { className: "grip", ariaLabel: `Move ${WIDGETS[card.dataset.w] || "card"}. Drag, or use the arrow keys`, title: "Drag to move" })));
 
@@ -826,7 +830,8 @@ document.addEventListener("pointerdown", e => {
   if (!grip || e.button !== 0 || drag) return;
   e.preventDefault();
   const card = grip.parentElement, r = card.getBoundingClientRect();
-  const slot = el("div", { className: "drop-slot" + (card.classList.contains("c-cal") ? " full" : "") });
+  const slot = el("div", { className: "drop-slot" + (card.classList.contains("c-cal") && !card.dataset.span ? " full" : "") });
+  if (card.dataset.span) slot.dataset.span = card.dataset.span;
   slot.style.height = r.height + "px";
   drag = { card, slot, id: e.pointerId, dx: e.clientX - r.left, dy: e.clientY - r.top, x: e.clientX, y: e.clientY, home: [card.parentElement, card.nextElementSibling] };
   card.after(slot);
@@ -901,6 +906,107 @@ document.addEventListener("keydown", e => {
   else return;
   grip.focus();
   save("layout", layoutNow());
+});
+
+/* ---------- resize: drag the handle in a card's corner ---------- */
+// height: the card itself. width: in a column, the edge between it and the next column; in a wide area, how many columns it covers
+const GROW = { tasks: "#tasks", deadlines: "#cds", habits: "#habits", days: "#dcs", notes: "#notes", calendar: "#cal" };  // the part that fills extra space and scrolls
+const COLS = ["left", "mid", "right"], MIN_COL = 280;
+let sizes = load("sizes", null) || {}, cols = load("cols", null);
+const growOf = card => GROW[card.dataset.w] ? card.querySelector(GROW[card.dataset.w]) : null;
+function applySize(card) {
+  const s = sizes[card.dataset.w] || {}, fill = growOf(card);
+  card.style.height = s.h && fill ? s.h + "px" : "";
+  card.style.minHeight = s.h && !fill ? s.h + "px" : "";  // cards without a scrolling part can grow but never cut off their content
+  card.classList.toggle("sized", !!s.h);
+  if (s.span) card.dataset.span = s.span; else delete card.dataset.span;
+}
+function applyCols() {
+  const wrap = document.querySelector(".wrap");
+  if (Array.isArray(cols) && cols.length === 3) wrap.style.setProperty("--cols", cols.map(f => `minmax(0, ${f}fr)`).join(" "));
+  else wrap.style.removeProperty("--cols");
+}
+function minHeight(card) {  // everything fits, except that the scrolling part may shrink to 80px
+  const fill = growOf(card), saved = sizes[card.dataset.w];
+  delete sizes[card.dataset.w]; applySize(card);
+  const natural = card.offsetHeight, min = fill ? natural - fill.offsetHeight + 80 : natural;
+  if (saved) sizes[card.dataset.w] = saved; applySize(card);
+  return Math.min(min, natural);
+}
+const colRects = () => COLS.map(z => document.querySelector(`[data-zone="${z}"]`).getBoundingClientRect());
+const isStacked = r => Math.abs(r[0].left - r[1].left) < 1;
+function setBoundary(zone, widths, delta) {  // move the edge right of the left/middle column (the right column moves the edge on its left)
+  const i = zone === "left" ? 0 : 1, w = [...widths], both = w[i] + w[i + 1];
+  w[i] = Math.min(both - MIN_COL, Math.max(MIN_COL, w[i] + delta));
+  w[i + 1] = both - w[i];
+  cols = w.map(x => +(x / 100).toFixed(3)); applyCols();
+}
+function spanAt(card, x, rects) {  // how many columns a card in a wide area should cover so its right edge is near x
+  const left = card.getBoundingClientRect().left;
+  const start = rects.reduce((b, r, i) => Math.abs(r.left - left) < Math.abs(rects[b].left - left) ? i : b, 0);
+  let span = 1;
+  for (let k = start + 1; k < 3; k++) if (x > rects[k].left + rects[k].width / 2) span++;
+  return span;
+}
+Object.values(GROW).forEach(sel => $(sel.slice(1)).classList.add("grow"));
+document.querySelectorAll(".card[data-w]").forEach(card => {
+  card.append(el("button", { className: "sizer", ariaLabel: `Resize ${WIDGETS[card.dataset.w] || "card"}. Drag, or use the arrow keys`, title: "Drag to resize. Double-click to reset" }));
+  applySize(card);
+});
+applyCols();
+
+let sizing = null;
+document.addEventListener("pointerdown", e => {
+  const handle = e.target.closest(".sizer");
+  if (!handle || e.button !== 0 || drag || sizing) return;
+  e.preventDefault();
+  const card = handle.parentElement, zone = card.parentElement, rects = colRects();
+  sizing = { card, id: e.pointerId, x0: e.clientX, y0: e.clientY, h0: card.offsetHeight, min: minHeight(card), zone: zone.dataset.zone,
+    wide: zone.classList.contains("zone-wide"), stacked: isStacked(rects), rects, widths: rects.map(r => r.width), moved: { x: false, y: false } };
+  handle.setPointerCapture(e.pointerId);
+  document.body.classList.add("resizing");
+});
+document.addEventListener("pointermove", e => {
+  const s = sizing;
+  if (!s || e.pointerId !== s.id) return;
+  const dx = e.clientX - s.x0, dy = e.clientY - s.y0, id = s.card.dataset.w, entry = sizes[id] = { ...sizes[id] };
+  // only change what you're actually dragging, so a sideways drag doesn't also fix the height
+  if (Math.abs(dy) > 4) s.moved.y = true;
+  if (Math.abs(dx) > 4) s.moved.x = true;
+  if (s.moved.y) entry.h = Math.round(Math.max(s.min, s.h0 + dy));
+  if (s.moved.x && !s.stacked) {
+    if (s.wide) entry.span = spanAt(s.card, e.clientX, s.rects);
+    else setBoundary(s.zone, s.widths, dx);
+  }
+  applySize(s.card);
+});
+function endSizing() {
+  if (!sizing) return;
+  document.body.classList.remove("resizing");
+  if (sizing.moved.x && !sizing.wide) save("cols", cols);
+  save("sizes", sizes);
+  sizing = null;
+}
+document.addEventListener("pointerup", e => { if (sizing && e.pointerId === sizing.id) endSizing(); });
+document.addEventListener("pointercancel", e => { if (sizing && e.pointerId === sizing.id) endSizing(); });
+document.addEventListener("dblclick", e => {
+  const handle = e.target.closest(".sizer");
+  if (!handle) return;
+  const card = handle.parentElement;
+  delete sizes[card.dataset.w]; applySize(card); save("sizes", sizes);
+});
+document.addEventListener("keydown", e => {  // keyboard: up/down for height, left/right for width
+  const handle = e.target.closest && e.target.closest(".sizer");
+  if (!handle || !/^Arrow(Up|Down|Left|Right)$/.test(e.key)) return;
+  e.preventDefault();
+  const card = handle.parentElement, zone = card.parentElement, id = card.dataset.w, entry = sizes[id] = { ...sizes[id] }, rects = colRects();
+  if (e.key === "ArrowUp" || e.key === "ArrowDown") entry.h = Math.max(minHeight(card), (entry.h || card.offsetHeight) + (e.key === "ArrowDown" ? 24 : -24));
+  else if (!isStacked(rects)) {
+    const dir = e.key === "ArrowRight" ? 1 : -1;
+    if (zone.classList.contains("zone-wide")) entry.span = Math.min(3, Math.max(1, (+card.dataset.span || (card.classList.contains("c-cal") ? 3 : 1)) + dir));
+    else { setBoundary(zone.dataset.zone, rects.map(r => r.width), dir * 24); save("cols", cols); }
+  }
+  applySize(card); save("sizes", sizes);
 });
 
 /* ---------- start ---------- */

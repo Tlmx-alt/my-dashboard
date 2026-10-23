@@ -18,7 +18,17 @@ Click the sliders button in the top-right corner to:
 Grab the small handle on the top edge of any card (it appears when you hover) and drag it into any
 column, or into the full-width areas above or below the columns. Your layout is saved. You can also
 focus a handle and use the arrow keys: up and down within a column, left and right to the next area.
-Press Escape while dragging to cancel, and use **Customize → Reset layout** to go back to the default.
+Press Escape while dragging to cancel.
+
+To resize a card, drag the small handle in its bottom corner (bottom-left for cards in the right column):
+
+- Up or down changes the card's height. Lists, notes and the calendar scroll if you make the card
+  shorter than its content; other cards can't be made smaller than what's in them.
+- Sideways changes the width. In a column this moves the edge between that column and its neighbour;
+  in the full-width areas the card snaps to cover 1, 2 or 3 columns.
+- Double-click the handle to reset that card, or focus it and use the arrow keys.
+
+**Customize → Reset layout** puts every card back in its default place and size.
 
 ## Stocks and news
 
