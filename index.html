@@ -84,6 +84,34 @@ try {
       <ul id="tasks"></ul>
     </section>
 
+    <!-- Stocks -->
+    <section class="card c-stocks" data-w="stocks" aria-label="Stocks">
+      <div class="card-h"><h2>Stocks</h2><span class="meta"><span id="stocksAt"></span><button class="icon-btn" id="stocksRefresh" aria-label="Refresh prices and news" title="Refresh"><svg class="ico"><use href="#i-refresh"/></svg></button></span></div>
+      <div class="setup" id="stocksSetup">
+        Follow live prices for the stocks you care about.
+        <button class="btn" data-setup>Connect a free Finnhub key</button>
+      </div>
+      <div id="stocksMain">
+        <form class="add" id="stockForm">
+          <input type="text" id="stockInput" placeholder="Add a ticker, e.g. AAPL" maxlength="20" aria-label="Add a stock ticker" autocomplete="off" spellcheck="false">
+          <button aria-label="Add stock"><svg class="ico"><use href="#i-plus"/></svg></button>
+        </form>
+        <ul id="stocks"></ul>
+      </div>
+      <p class="msg" id="stocksMsg" aria-live="polite"></p>
+    </section>
+
+    <!-- News -->
+    <section class="card c-news" data-w="news" aria-label="News">
+      <div class="card-h"><h2>News</h2><span class="meta" id="newsFilter"></span></div>
+      <div class="setup" id="newsSetup">
+        Market headlines, or news for one of your stocks.
+        <button class="btn" data-setup>Connect a free Finnhub key</button>
+      </div>
+      <ul id="news"></ul>
+      <p class="msg" id="newsMsg" aria-live="polite"></p>
+    </section>
+
     <!-- Deadlines -->
     <section class="card c-cd" data-w="deadlines" aria-label="Deadlines">
       <div class="card-h"><h2>Deadlines</h2></div>
@@ -173,6 +201,17 @@ try {
       <div class="seg" id="themeSeg">
         <button data-t="">Auto</button><button data-t="light">Light</button><button data-t="dark">Dark</button>
       </div>
+    </section>
+
+    <section>
+      <h3>Stocks &amp; news</h3>
+      <p class="lead">Prices and headlines come from <a href="https://finnhub.io/register" target="_blank" rel="noopener noreferrer">Finnhub</a>. Sign up for a free key and paste it here.</p>
+      <div class="add">
+        <input type="text" id="fhKey" placeholder="Finnhub API key" aria-label="Finnhub API key" autocomplete="off" spellcheck="false">
+        <button id="fhSave" aria-label="Save key"><svg class="ico"><use href="#i-check"/></svg></button>
+      </div>
+      <button class="link-btn" id="fhRemove">Remove key</button>
+      <p class="hint" id="fhMsg" aria-live="polite"></p>
     </section>
 
     <section>

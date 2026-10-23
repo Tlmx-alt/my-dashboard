@@ -550,9 +550,143 @@ notes.oninput = () => {
   noteT = setTimeout(() => { save("notes", notes.value); $("saved").textContent = "Saved"; setTimeout(() => $("saved").textContent = "", 1500); }, 400);
 };
 
+/* ---------- stocks + news: Finnhub (free key), called straight from the browser ---------- */
+const FH = "https://finnhub.io/api/v1/";
+let fhKey = load("finnhubKey", "");
+let watch = load("watchlist", ["AAPL", "MSFT", "GOOGL"]);
+let quotes = {}, quotesAt = 0, news = [], newsAt = 0, newsFor = null;  // newsFor: a ticker, or null for market news
+const isShown = w => !hidden.includes(w);
+async function fh(path, params = {}, key = fhKey) {
+  let r;
+  try { r = await fetch(FH + path + "?" + new URLSearchParams({ ...params, token: key })); }
+  catch { throw Object.assign(new Error("offline"), { status: 0 }); }
+  if (!r.ok) throw Object.assign(new Error("Finnhub " + r.status), { status: r.status });
+  return r.json();
+}
+const FH_MSG = { 0: "Couldn't reach Finnhub. Check your connection.", 401: "Finnhub didn't accept your key. Update it in Customize.",
+  429: "Finnhub's free limit was reached. Trying again in a minute." };
+const fhMsg = e => FH_MSG[e.status] || "Finnhub had a problem. Trying again shortly.";
+const hasQuote = q => q && (q.c || q.pc);  // unknown tickers come back as all zeros
+const price = n => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const ago = sec => { const m = Math.max(1, Math.round((Date.now() / 1000 - sec) / 60)); return m < 60 ? m + "m ago" : m < 1440 ? Math.round(m / 60) + "h ago" : Math.round(m / 1440) + "d ago"; };
+
+async function refreshQuotes() {
+  if (!fhKey || !isShown("stocks") || !watch.length) return renderStocks();
+  quotesAt = Date.now();
+  const syms = [...watch];
+  const res = await Promise.allSettled(syms.map(symbol => fh("quote", { symbol })));
+  res.forEach((r, i) => { if (r.status === "fulfilled") quotes[syms[i]] = r.value; else if (r.reason.status === 403) quotes[syms[i]] = { plan: true }; });
+  const failed = res.find(r => r.status === "rejected" && r.reason.status !== 403);
+  $("stocksMsg").textContent = failed ? fhMsg(failed.reason) : "";
+  if (res.some(r => r.status === "fulfilled")) $("stocksAt").textContent = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  renderStocks();
+}
+function renderStocks() {
+  $("stocksSetup").hidden = !!fhKey;
+  $("stocksMain").hidden = $("stocksRefresh").hidden = $("stocksAt").hidden = !fhKey;
+  $("stocks").replaceChildren(...(watch.length ? watch.map(sym => {
+    const q = quotes[sym];
+    const symBtn = el("button", { className: "sym", textContent: sym, title: `Show ${sym} news`, onclick: () => setNewsFor(newsFor === sym ? null : sym) });
+    symBtn.setAttribute("aria-pressed", newsFor === sym);
+    let info;
+    if (!q) info = [el("span", { className: "px muted", textContent: "…" })];
+    else if (q.plan || !hasQuote(q)) info = [el("span", { className: "px muted", textContent: q.plan ? "Not on free plan" : "No data" })];
+    else {
+      const dp = q.dp ?? 0, d = q.d ?? 0;
+      info = [el("span", { className: "px", textContent: price(q.c) }),
+        el("span", { className: "chg" + (d > 0 ? " up" : d < 0 ? " down" : ""), textContent: (dp > 0 ? "+" : "") + dp.toFixed(2) + "%", title: `${d > 0 ? "+" : ""}${price(d)} today` })];
+    }
+    const li = el("li", { className: "stock" }, symBtn, ...info,
+      el("button", { className: "icon-btn del", ariaLabel: `Remove ${sym}`, onclick: () => removeAnimated(li, () => {
+        watch = watch.filter(x => x !== sym); delete quotes[sym]; save("watchlist", watch);
+        if (newsFor === sym) setNewsFor(null);
+        renderStocks();
+      }) }, icon("trash")));
+    return li;
+  }) : [el("li", { className: "empty", textContent: "Add a ticker to follow its price." })]));
+}
+$("stockForm").onsubmit = async e => {
+  e.preventDefault();
+  const input = $("stockInput"), btn = e.target.querySelector("button"), sym = input.value.trim().toUpperCase(), msg = t => $("stocksMsg").textContent = t;
+  if (!sym) return;
+  if (!/^[A-Z0-9.:^=-]{1,20}$/.test(sym)) return msg("Tickers use letters, numbers and dots, like AAPL or BRK.B.");
+  if (watch.includes(sym)) { input.value = ""; return; }
+  btn.classList.add("busy"); btn.disabled = true;
+  try {
+    const q = await fh("quote", { symbol: sym });
+    if (!hasQuote(q)) return msg(`Couldn't find ${sym}. Check the ticker.`);
+    quotes[sym] = q; watch.push(sym); save("watchlist", watch);
+    input.value = ""; msg(""); renderStocks();
+  } catch (err) { msg(err.status === 403 ? `${sym} isn't included in Finnhub's free plan.` : fhMsg(err)); }
+  finally { btn.classList.remove("busy"); btn.disabled = false; }
+};
+
+async function refreshNews() {
+  if (!fhKey || !isShown("news")) return renderNews();
+  newsAt = Date.now();
+  const forSym = newsFor;
+  try {
+    const items = forSym
+      ? await fh("company-news", { symbol: forSym, from: dayKey(new Date(Date.now() - 7 * 864e5)), to: dayKey() })
+      : await fh("news", { category: "general" });
+    if (forSym !== newsFor) return;  // switched to another ticker while this was loading
+    const seen = new Set();
+    news = (Array.isArray(items) ? items : [])
+      .filter(n => n.headline && /^https?:\/\//.test(n.url) && !seen.has(n.headline) && seen.add(n.headline))
+      .sort((a, b) => b.datetime - a.datetime).slice(0, 8);
+    $("newsMsg").textContent = "";
+  } catch (err) {
+    if (forSym !== newsFor) return;
+    if (news === null) news = [];
+    $("newsMsg").textContent = fhMsg(err);
+  }
+  renderNews();
+}
+function setNewsFor(sym) { newsFor = sym; news = null; renderStocks(); renderNews(); refreshNews(); }
+function renderNews() {
+  $("newsSetup").hidden = !!fhKey;
+  $("newsFilter").replaceChildren(!fhKey ? "" : newsFor
+    ? el("button", { className: "chip", ariaLabel: `Showing ${newsFor} news. Show market news instead`, title: "Back to market news", onclick: () => setNewsFor(null) }, newsFor, icon("x"))
+    : "Market");
+  $("news").replaceChildren(...(!fhKey ? [] : news === null ? [el("li", { className: "empty", textContent: "Loading…" })] : news.length
+    ? news.map(n => el("li", {}, el("a", { className: "headline", href: n.url, target: "_blank", rel: "noopener noreferrer" },
+        el("span", { textContent: n.headline }), el("small", { textContent: [n.source, n.datetime ? ago(n.datetime) : ""].filter(Boolean).join(" · ") }))))
+    : [el("li", { className: "empty", textContent: newsFor ? `No ${newsFor} news in the last week.` : "No headlines right now." })]));
+}
+
+// prices every minute and headlines every 10 minutes, only while the page is open and the card is showing
+function refreshMarkets(force) {
+  if (force || Date.now() - quotesAt > 60e3) refreshQuotes();
+  if (force || Date.now() - newsAt > 10 * 60e3) refreshNews();
+}
+setInterval(() => { if (!document.hidden) refreshMarkets(); }, 15e3);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshMarkets(); });
+$("stocksRefresh").onclick = () => refreshMarkets(true);
+document.querySelectorAll("[data-setup]").forEach(b => b.onclick = () => openSettings("fhKey"));
+
+async function saveKey() {
+  const input = $("fhKey"), key = input.value.trim(), msg = t => $("fhMsg").textContent = t;
+  if (!key) return;
+  msg("Checking key…");
+  try { await fh("quote", { symbol: "AAPL" }, key); }
+  catch (err) { return msg(err.status === 401 ? "Finnhub didn't accept that key. Check it and try again." : fhMsg(err)); }
+  fhKey = key; save("finnhubKey", key); input.value = "";
+  msg("Connected. Prices and news are loading.");
+  quotes = {}; news = null; renderSettings(); renderStocks(); renderNews(); refreshMarkets(true);
+}
+$("fhSave").onclick = saveKey;
+$("fhKey").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); saveKey(); } };
+$("fhRemove").onclick = () => {
+  fhKey = ""; save("finnhubKey", ""); quotes = {}; news = []; newsFor = null;
+  $("stocksMsg").textContent = $("newsMsg").textContent = "";
+  $("fhMsg").textContent = "Key removed.";
+  renderSettings(); renderStocks(); renderNews();
+};
+
 /* ---------- customize panel: wallpaper, theme, which widgets show ---------- */
 const root = document.documentElement, dialog = $("settings");
-$("openSettings").onclick = () => { renderSettings(); dialog.showModal(); };
+function openSettings(focusId) { renderSettings(); dialog.showModal(); if (focusId) $(focusId).focus(); }
+$("openSettings").onclick = () => openSettings();
 $("closeSettings").onclick = () => dialog.close();
 dialog.onclick = e => { if (e.target === dialog) dialog.close(); };  // click on the dimmed backdrop
 
@@ -620,7 +754,7 @@ const savedTheme = load("theme", null);
 if (savedTheme) root.dataset.theme = savedTheme;
 
 // widgets you can hide
-const WIDGETS = { quote: "Quote", timer: "Focus timer", tasks: "Tasks", deadlines: "Deadlines", habits: "Habits",
+const WIDGETS = { quote: "Quote", timer: "Focus timer", tasks: "Tasks", stocks: "Stocks", news: "News", deadlines: "Deadlines", habits: "Habits",
   water: "Water", calendar: "Calendar", days: "Day counter", notes: "Notes" };
 let hidden = load("hidden", []);
 const applyWidgets = () => document.querySelectorAll("[data-w]").forEach(n => { if (n.dataset.w in WIDGETS) n.hidden = hidden.includes(n.dataset.w); });
@@ -645,20 +779,23 @@ function renderSettings() {
   $("widgetToggles").replaceChildren(...Object.entries(WIDGETS).map(([id, name]) => el("label", {}, name,
     el("input", { type: "checkbox", checked: !hidden.includes(id), onchange: e => {
       hidden = e.target.checked ? hidden.filter(x => x !== id) : [...hidden, id];
-      save("hidden", hidden); applyWidgets();
+      save("hidden", hidden); applyWidgets(); refreshMarkets();
     } }))));
+  $("fhKey").placeholder = fhKey ? `Key saved (…${fhKey.slice(-4)}). Paste to replace` : "Finnhub API key";
+  $("fhRemove").hidden = !fhKey;
 }
 applyWallpaper(); applyWidgets();
 
 /* ---------- start ---------- */
 function renderAll() {
   showQuote(dailyQuote());
-  renderStats(); renderTasks(); renderHabits(); renderCountdowns(); renderWater(); renderDays();
+  renderStats(); renderTasks(); renderHabits(); renderCountdowns(); renderWater(); renderDays(); renderStocks(); renderNews();
 }
 tickClock();
 setInterval(tickClock, 1000);
 setInterval(renderCountdowns, 60_000);
 renderAll();
+refreshMarkets(true);
 
 // restore the timer from the last visit
 const st = load("timer", null);

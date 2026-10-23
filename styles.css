@@ -207,6 +207,31 @@
   .dc-n { min-width: 70px; }
   .dc.ahead .dc-n { background: color-mix(in srgb, #e8892b 20%, transparent); }
 
+  /* stocks + news */
+  :root { --up: #16884a; --down: #c93a3a; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --up: #3ccf7f; --down: #ff6b6b; } }
+  :root[data-theme="dark"] { --up: #3ccf7f; --down: #ff6b6b; }
+  .c-stocks .meta { display: flex; align-items: center; gap: 4px; }
+  .stock { display: flex; align-items: center; gap: 10px; padding: 6px; border-radius: 10px; font-variant-numeric: tabular-nums; }
+  .stock:hover { background: var(--track); }
+  .stock .sym { flex: 1; text-align: left; font-size: 14px; font-weight: 600; padding: 2px 0; }
+  .stock .sym:hover, .stock .sym[aria-pressed=true] { color: var(--accent); }
+  .stock .px { font-family: var(--num); font-size: 14px; }
+  .stock .px.muted { font-family: var(--sans); font-size: 12px; color: var(--muted); }
+  .chg { font-family: var(--num); font-size: 12px; font-weight: 600; min-width: 66px; text-align: right; padding: 3px 7px; border-radius: 7px; background: var(--track); color: var(--muted); }
+  .chg.up { color: var(--up); background: color-mix(in srgb, var(--up) 14%, transparent); }
+  .chg.down { color: var(--down); background: color-mix(in srgb, var(--down) 14%, transparent); }
+  .setup { text-align: center; font-size: 13px; color: var(--muted); line-height: 1.5; }
+  .setup .btn { margin-top: 12px; color: var(--fg); }
+  .msg { margin: 8px 0 0; font-size: 12px; color: var(--muted); }
+  .msg:empty { display: none; }
+  .headline { display: block; padding: 8px 6px; border-radius: 10px; color: inherit; text-decoration: none; }
+  .headline:hover { background: var(--track); }
+  .headline span { display: block; font-size: 14px; line-height: 1.4; }
+  .headline small { display: block; margin-top: 3px; font-size: 12px; color: var(--muted); }
+  .chip { display: inline-flex; align-items: center; gap: 4px; padding: 3px 6px 3px 9px; border-radius: 999px; background: var(--track); font-size: 12px; font-weight: 600; color: var(--fg); }
+  .chip .ico { width: 12px; height: 12px; }
+
   /* ---------- customize panel ---------- */
   dialog { margin: 0 0 0 auto; height: 100%; max-height: none; width: min(380px, 100%); border: 0; padding: 0; background: var(--sheet); color: var(--fg); box-shadow: -8px 0 40px rgba(0,0,0,.15); }
   dialog::backdrop { background: rgba(0,0,0,.2); }
@@ -228,6 +253,9 @@
   .dim { display: flex; align-items: center; gap: 12px; margin-top: 12px; font-size: 13px; color: var(--muted); }
   .dim input { flex: 1; accent-color: var(--accent); }
   .hint { margin: 8px 0 0; font-size: 12px; color: var(--muted); min-height: 16px; }
+  .lead { margin: 0 0 10px; font-size: 13px; color: var(--muted); line-height: 1.5; }
+  .lead a { color: var(--accent); }
+  #fhRemove { margin: 6px 0 0 -8px; }
   .seg { display: flex; gap: 2px; background: var(--field); padding: 3px; border-radius: 10px; }
   .seg button { flex: 1; padding: 7px; border-radius: 8px; font-size: 13px; color: var(--muted); }
   .seg button[aria-pressed=true] { background: var(--sheet); color: var(--fg); box-shadow: 0 1px 3px rgba(0,0,0,.12); }

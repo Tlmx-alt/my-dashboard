@@ -13,6 +13,17 @@ Click the sliders button in the top-right corner to:
 - **Switch theme**: Auto (follows your system), Light or Dark.
 - **Show or hide widgets**: turn off anything you don't use to keep the page simple.
 
+## Stocks and news
+
+The Stocks and News cards use [Finnhub](https://finnhub.io). Sign up for a free API key at
+https://finnhub.io/register, then paste it under **Customize → Stocks & news**.
+
+- Add tickers like `AAPL` or `BRK.B` to the Stocks card. Prices refresh every minute while the page is open.
+- The News card shows market headlines. Click a ticker to see that company's news from the last week,
+  and click the ticker chip in the News card to go back.
+- The free plan mainly covers US-listed stocks; tickers outside it show "Not on free plan".
+- Your key is saved with the rest of your data (browser storage, and `data.json` when using the server).
+
 ## Run it
 
 1. Double-click `start.command` (macOS). The first run sets up Python and opens
