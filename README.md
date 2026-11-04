@@ -5,7 +5,8 @@ focus calendar and a daily quote. Everything runs on your own computer.
 
 ## Customize
 
-Click the sliders button in the top-right corner to:
+The sidebar on the left (a bar along the bottom on a phone) has a button for each card: click one to jump to it.
+The chart button opens stocks and news, and the sliders button at the bottom opens Customize, where you can:
 
 - **Pick a wallpaper**: choose a preset (the default, Ember, is dark with a warm glow), upload your own photo, or paste an image link. Photos get a
   "Darken" slider so the text stays readable. An uploaded photo is kept in this browser only (it is
@@ -32,8 +33,8 @@ To resize a card, drag the small handle in its bottom corner (bottom-left for ca
 
 ## Stocks and news
 
-Click the chart button in the top-left corner to open the **Markets** sidebar, and the arrow inside it to
-close it. On a wide screen the dashboard moves over to make room; on a phone the sidebar slides over it.
+Click the chart button in the sidebar to open the **Markets** panel, and click it again (or the arrow inside
+the panel) to close it. On a wide screen the dashboard moves over to make room; on a phone the sidebar slides over it.
 The sidebar remembers whether it was open.
 
 Prices and headlines come from [Finnhub](https://finnhub.io). Sign up for a free API key at

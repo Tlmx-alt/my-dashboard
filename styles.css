@@ -8,6 +8,7 @@
     --plain: radial-gradient(1400px 700px at 50% -15%, #fdfbf8, transparent 70%), linear-gradient(180deg, #f3f1ee, #e9e6e2);
     --glass: linear-gradient(145deg, rgba(255,255,255,.8), rgba(255,255,255,.5)); --glass-border: rgba(255,255,255,.75); --glass-hl: inset 0 1px 0 rgba(255,255,255,.9);
     --inset: rgba(255,255,255,.5); --pill: #1c1b1a; --pill-fg: #fff;
+    --rail-bg: rgba(255,255,255,.62); --glass-border-hover: rgba(255,255,255,.95); --shadow-hover: 0 1px 2px rgba(30,24,18,.05), 0 20px 44px -18px rgba(30,24,18,.3);
     --accent: var(--c-focus, #ff7a2f); --accent-fg: var(--f-focus, #1a1209);  /* --c-* / --f-* are set from app.js when you pick a colour */
     --radius: 26px;
     --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Helvetica Neue", "Segoe UI", sans-serif;
@@ -20,8 +21,9 @@
       --btn: rgba(255,255,255,.09); --btn-hover: rgba(255,255,255,.16); --raised: #3a3a3d; --hl: inset 0 1px 0 rgba(255,255,255,.05);
       --shadow: 0 1px 2px rgba(0,0,0,.3), 0 16px 40px -18px rgba(0,0,0,.7);
       --plain: radial-gradient(1400px 700px at 50% -15%, #262422, transparent 70%), linear-gradient(180deg, #151414, #0e0e0e);
-      --glass: linear-gradient(145deg, rgba(255,255,255,.13), rgba(255,255,255,.04)); --glass-border: rgba(255,255,255,.14); --glass-hl: inset 0 1px 0 rgba(255,255,255,.14);
+      --glass: linear-gradient(145deg, rgba(255,255,255,.12), rgba(255,255,255,.03)), rgba(18,18,22,.42);  /* tinted base keeps text readable on bright wallpapers */ --glass-border: rgba(255,255,255,.14); --glass-hl: inset 0 1px 0 rgba(255,255,255,.14);
       --inset: rgba(255,255,255,.06); --pill: #fff; --pill-fg: #141414;
+      --rail-bg: rgba(12,12,14,.55); --glass-border-hover: rgba(255,255,255,.24); --shadow-hover: 0 1px 2px rgba(0,0,0,.35), 0 24px 50px -18px rgba(0,0,0,.8);
   }
   body.short { --accent: var(--c-short, #cf4129); --accent-fg: var(--f-short, #fff); }
   body.long  { --accent: var(--c-long, #1b7a4e); --accent-fg: var(--f-long, #fff); }
@@ -56,8 +58,6 @@
 
   /* ---------- layout ---------- */
   .wrap { max-width: 1120px; margin: 0 auto; padding: 56px 20px 64px; }
-  .corner { position: fixed; top: 16px; right: 16px; z-index: 5; width: 42px; height: 42px; border-radius: 14px; color: var(--on-wall); border: 1px solid var(--glass-border); background: var(--glass); box-shadow: var(--glass-hl); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); }
-  .corner:hover { background: var(--card); color: var(--fg); }
 
   /* hero: clock, greeting, quote */
   .hero { text-align: center; color: var(--on-wall); text-shadow: var(--on-wall-shadow); margin-bottom: 44px; }
@@ -130,11 +130,16 @@
   .card {
     min-width: 0;
     background: var(--glass); border: 1px solid var(--glass-border); border-radius: var(--radius); padding: 22px;
-    box-shadow: var(--glass-hl), var(--shadow);
+    box-shadow: var(--glass-hl), var(--shadow); scroll-margin: 24px; transition: border-color .2s, box-shadow .2s;
     -webkit-backdrop-filter: blur(30px) saturate(1.6); backdrop-filter: blur(30px) saturate(1.6);
   }
   .card-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 14px; min-height: 28px; }
-  .card-h h2 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -.01em; }
+  .card:hover { border-color: var(--glass-border-hover); box-shadow: var(--glass-hl), var(--shadow-hover); }
+  .card.flash { animation: flash 1.4s ease-out; }  /* when you jump to a card from the sidebar */
+  @keyframes flash { 0%, 35% { box-shadow: var(--glass-hl), 0 0 0 2px var(--accent), 0 0 30px -4px var(--accent); } }
+  .card-h h2 { margin: 0; font-size: 15px; font-weight: 600; letter-spacing: -.01em; display: flex; align-items: center; gap: 10px; }
+  .h-ico { width: 32px; height: 32px; border-radius: 11px; display: grid; place-items: center; background: var(--inset); border: 1px solid var(--glass-border); color: var(--accent); flex: none; }
+  .h-ico .ico { width: 16px; height: 16px; }
   .ico { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
   .meta { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
   .icon-btn { width: 30px; height: 30px; border-radius: 9px; color: var(--muted); display: grid; place-items: center; }
@@ -164,13 +169,14 @@
   .tabs button { flex: 1; color: var(--muted); padding: 7px 4px; border-radius: 999px; font-size: 13px; font-weight: 500; }
   .tabs button:hover { color: var(--fg); }
   .tabs button.active { background: var(--raised); color: var(--fg); box-shadow: 0 1px 3px rgba(0,0,0,.14); }
+  .c-timer { background: radial-gradient(60% 42% at 50% 34%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 72%), var(--glass); }
   .ring { position: relative; margin: 24px auto 20px; width: min(220px, 100%); aspect-ratio: 1; }
   .ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
   .ring circle { fill: none; stroke-width: 7; }
   .ring .bg { stroke: var(--track); }
   .ring .fg { stroke: var(--accent); stroke-linecap: round; transition: stroke-dashoffset 1s linear, stroke .3s; filter: drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 65%, transparent)); }
   .time { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
-  .time b { font-family: var(--num); font-weight: 300; font-size: 52px; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+  .time b { font-family: var(--num); font-weight: 200; font-size: 58px; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
   .time small { color: var(--muted); font-size: 13px; }
   .controls { display: flex; gap: 10px; justify-content: center; align-items: center; }
   .controls .round { width: 44px; height: 44px; border-radius: 50%; background: var(--btn); display: grid; place-items: center; }
@@ -206,10 +212,10 @@
   .sw label.pick input { position: absolute; inset: -6px; width: 36px; height: 36px; opacity: 0; cursor: pointer; }
 
   /* ---------- lists ---------- */
-  ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+  ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
   .empty { color: var(--muted); font-size: 13px; text-align: center; padding: 12px 0; line-height: 1.5; }
-  .task, .habit, .cd, .dc { display: flex; align-items: center; gap: 10px; padding: 7px 6px; border-radius: 10px; }
-  .task:hover, .habit:hover, .cd:hover, .dc:hover { background: var(--track); }
+  .task, .habit, .cd, .dc { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 14px; background: var(--inset); border: 1px solid var(--glass-border); transition: border-color .15s; }
+  .task:hover, .habit:hover, .cd:hover, .dc:hover { border-color: var(--glass-border-hover); }
   .del { opacity: 0; }
   li:hover .del, li:focus-within .del { opacity: 1; }
   @media (hover: none) { .del { opacity: 1; } }
@@ -227,7 +233,7 @@
   @keyframes leave { to { opacity: 0; height: 0; padding-top: 0; padding-bottom: 0; } }
 
   /* deadlines */
-  .cd .when, .dc-n { font-family: var(--num); min-width: 60px; text-align: center; padding: 5px 6px; border-radius: 9px; background: var(--track); font-size: 11px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .cd .when, .dc-n { font-family: var(--num); min-width: 60px; text-align: center; padding: 5px 6px; border-radius: 10px; background: var(--btn); font-size: 11px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; }
   .cd .when b, .dc-n b { display: block; font-size: 17px; line-height: 1.15; color: var(--fg); }
   .cd.soon .when { background: color-mix(in srgb, #e8892b 22%, transparent); }
   .cd.past { opacity: .5; }
@@ -240,7 +246,7 @@
   /* water */
   .c-water .meta input { width: 64px; padding: 3px 6px; text-align: center; border-radius: 7px; font-size: 13px; }
   .water-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
-  .water-row .big { font-family: var(--num); font-size: 30px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .water-row .big { font-family: var(--num); font-size: 40px; font-weight: 300; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
   .water-row .big small { font-size: 13px; color: var(--muted); font-weight: 500; }
   .stepper { display: flex; gap: 6px; }
   .stepper button { width: 38px; height: 38px; border-radius: 10px; background: var(--btn); display: grid; place-items: center; }
@@ -282,7 +288,7 @@
 
   /* day counter */
   .year { margin-bottom: 14px; }
-  .year-n { font-family: var(--num); font-size: 24px; font-weight: 600; margin-bottom: 8px; }
+  .year-n { font-family: var(--num); font-size: 30px; font-weight: 400; letter-spacing: -.02em; margin-bottom: 8px; }
   .year-n small { font-size: 13px; color: var(--muted); font-weight: 500; }
   .days-form { flex-wrap: wrap; }
   .days-form input[type=text] { flex: 1 1 100%; }
@@ -293,19 +299,49 @@
   /* stocks + news */
   :root { --up: #16884a; --down: #c93a3a; }
   :root[data-tone="dark"] { --up: #3ccf7f; --down: #ff6b6b; }
-  :root { --side-w: 340px; }
-  .corner.left { left: 16px; right: auto; }
-  [data-markets="open"] #openMarkets { visibility: hidden; }
-  .markets {
-    position: fixed; top: 0; bottom: 0; left: 0; z-index: 6; width: min(var(--side-w), 88vw); overflow-y: auto; padding: 18px 18px 28px;
-    background: var(--glass); border-right: 1px solid var(--glass-border);
+  /* ---------- sidebar: a glass rail on the left, a bar along the bottom on phones ---------- */
+  :root { --side-w: 320px; --rail-w: 64px; --edge: 16px; --rail-space: calc(var(--rail-w) + var(--edge) * 2); }
+  body { padding-left: var(--rail-space); transition: padding-left .25s ease; }
+  .rail {
+    position: fixed; z-index: 7; top: var(--edge); bottom: var(--edge); left: var(--edge); width: var(--rail-w);
+    display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 14px 0;
+    border-radius: 24px; background: var(--rail-bg); border: 1px solid var(--glass-border); box-shadow: var(--glass-hl), var(--shadow);
     -webkit-backdrop-filter: blur(30px) saturate(1.6); backdrop-filter: blur(30px) saturate(1.6);
-    transform: translateX(-100%); visibility: hidden; transition: transform .25s ease, visibility 0s .25s;
   }
-  [data-markets="open"] .markets { transform: none; visibility: visible; transition: transform .25s ease; }
-  body { transition: padding-left .25s ease; }
-  @media (min-width: 960px) { [data-markets="open"] body { padding-left: var(--side-w); } }  /* wide screens: the dashboard moves over */
-  @media (max-width: 959px) { .markets { background: var(--sheet); box-shadow: 8px 0 40px rgba(0,0,0,.18); } }  /* narrow: slides over it */
+  .rail-logo { width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center; color: var(--fg); margin-bottom: 12px; }
+  .rail-logo .ico { width: 26px; height: 26px; stroke-width: 1.8; }
+  .rail-items { display: flex; flex-direction: column; gap: 6px; }
+  .rail-btn { position: relative; flex: none; width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center; color: var(--muted); }
+  .rail-btn:hover { color: var(--fg); background: var(--btn); }
+  .rail-btn[aria-current="true"], .rail-btn[aria-expanded="true"] { color: var(--fg); background: var(--inset); box-shadow: inset 0 0 0 1px var(--glass-border), var(--glass-hl); }
+  .rail-btn[aria-current="true"]::before { content: ""; position: absolute; left: -11px; top: 12px; bottom: 12px; width: 3px; border-radius: 99px; background: var(--accent); }
+  .rail-sep { flex: none; width: 24px; height: 1px; background: var(--glass-border); margin: 6px 0; }
+  .rail-end { margin-top: auto; }
+  .rail-btn[data-tip]::after {  /* the label that appears beside an icon */
+    content: attr(data-tip); position: absolute; left: calc(100% + 14px); top: 50%; transform: translate(-4px, -50%); white-space: nowrap; z-index: 2;
+    padding: 5px 10px; border-radius: 8px; background: var(--pill); color: var(--pill-fg); font-size: 12px; font-weight: 500; opacity: 0; pointer-events: none; transition: opacity .15s, transform .15s;
+  }
+  .rail-btn:hover::after, .rail-btn:focus-visible::after { opacity: 1; transform: translate(0, -50%); }
+  .markets {
+    position: fixed; z-index: 6; top: var(--edge); bottom: var(--edge); left: calc(var(--rail-space) - 4px); width: min(var(--side-w), 88vw); overflow-y: auto; padding: 18px 18px 28px;
+    border-radius: 24px; background: var(--glass); border: 1px solid var(--glass-border); box-shadow: var(--glass-hl), var(--shadow);
+    -webkit-backdrop-filter: blur(30px) saturate(1.6); backdrop-filter: blur(30px) saturate(1.6);
+    opacity: 0; transform: translateX(-16px); visibility: hidden; transition: opacity .2s ease, transform .25s ease, visibility 0s .25s;
+  }
+  [data-markets="open"] .markets { opacity: 1; transform: none; visibility: visible; transition: opacity .2s ease, transform .25s ease; }
+  @media (min-width: 1000px) { [data-markets="open"] body { padding-left: calc(var(--rail-space) + var(--side-w) + 4px); } }  /* wide screens: the dashboard moves over */
+  @media (max-width: 999px) { .markets { background: var(--sheet); box-shadow: 8px 0 40px rgba(0,0,0,.25); } }  /* narrower: the panel slides over it */
+  @media (max-width: 700px) {
+    body { padding-left: 0; padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+    .rail { top: auto; right: 12px; left: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); width: auto; height: 62px; flex-direction: row; padding: 0 10px; overflow-x: auto; scrollbar-width: none; }
+    .rail-logo { display: none; }
+    .rail-items { flex-direction: row; }
+    .rail-sep { width: 1px; height: 24px; margin: 0 4px; }
+    .rail-end { margin: 0 0 0 auto; }
+    .rail-btn::after { display: none; }
+    .rail-btn[aria-current="true"]::before { left: 12px; right: 12px; top: auto; bottom: -9px; width: auto; height: 3px; }
+    .markets { top: 0; bottom: 0; left: 0; border-radius: 0 24px 24px 0; }
+  }
   .markets-h { display: flex; align-items: center; gap: 6px; margin-bottom: 18px; }
   .markets-h h2 { flex: 1; margin: 0; font-size: 17px; font-weight: 600; }
   .markets-h .meta { display: flex; align-items: center; gap: 2px; }

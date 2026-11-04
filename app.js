@@ -572,7 +572,7 @@ function setMarketsOpen(open) {
   if (open) { refreshMarkets(); $("closeMarkets").focus({ preventScroll: true }); }
   else $("openMarkets").focus({ preventScroll: true });
 }
-$("openMarkets").onclick = () => setMarketsOpen(true);
+$("openMarkets").onclick = () => setMarketsOpen(!marketsOpen());
 $("closeMarkets").onclick = () => setMarketsOpen(false);
 $("markets").addEventListener("keydown", e => { if (e.key === "Escape") setMarketsOpen(false); });
 if (load("marketsOpen", false)) html.dataset.markets = "open"; else delete html.dataset.markets;  // data.json wins over the early guess in index.html
@@ -810,6 +810,32 @@ function renderSettings() {
   $("fhRemove").hidden = !fhKey;
 }
 applyWallpaper(); applyWidgets();
+
+/* ---------- sidebar: a button for each card; the one you're looking at is lit ---------- */
+const CARD_ICONS = { timer: "timer", tasks: "tasks", deadlines: "flag", habits: "flame", water: "drop", calendar: "cal", days: "hourglass", notes: "note" };
+$("railItems").replaceChildren(...Object.entries(CARD_ICONS).map(([id, ic]) => {
+  const b = el("button", { className: "rail-btn", ariaLabel: WIDGETS[id], onclick: () => {
+    const card = document.querySelector(`.card[data-w="${id}"]`);
+    card.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
+    card.classList.remove("flash"); void card.offsetWidth; card.classList.add("flash");
+  } }, icon(ic));
+  b.dataset.w = id; b.dataset.tip = WIDGETS[id];
+  return b;
+}));
+applyWidgets();  // hides the buttons of hidden cards too
+$("railTop").onclick = () => scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" });
+const seen = {};  // how many pixels of each card are on screen
+const watcher = new IntersectionObserver(entries => {
+  for (const e of entries) seen[e.target.dataset.w] = e.isIntersecting ? e.intersectionRect.height : 0;
+  const [best, px] = Object.entries(seen).sort((a, b) => b[1] - a[1])[0] || [];
+  document.querySelectorAll(".rail-btn[data-w]").forEach(b => b.setAttribute("aria-current", px > 0 && b.dataset.w === best));
+}, { threshold: [0, .1, .25, .5, .75, 1] });
+document.querySelectorAll(".card[data-w]").forEach(c => watcher.observe(c));
+// an icon tile in front of each card's title (the calendar's title is the month, which renders itself)
+for (const [id, ic] of Object.entries(CARD_ICONS)) {
+  const h = document.querySelector(`.card[data-w="${id}"] .card-h h2:not(#calTitle)`);
+  if (h) h.prepend(el("span", { className: "h-ico", ariaHidden: "true" }, icon(ic)));
+}
 
 /* ---------- arrange: drag cards by the handle on their top edge into any column or the wide areas ---------- */
 const ZONES = [...document.querySelectorAll("[data-zone]")];
