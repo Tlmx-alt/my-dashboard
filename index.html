@@ -15,8 +15,11 @@ try {
     const src = w.id === "upload" ? localStorage.getItem("wallpaper-image") : w.id === "url" ? w.url : null;
     if (src) { r.dataset.wall = "image"; r.style.setProperty("--wall-img", `url(${JSON.stringify(src)})`); r.style.setProperty("--dim", (w.dim ?? 25) / 100); }
     else if (w.id !== "upload" && w.id !== "url") r.dataset.wall = w.id;
-  }
+  } else r.dataset.wall = "ember";  // default wallpaper
 } catch {}
+// light or dark colours: the theme you picked, or with Auto, dark on a dark wallpaper or when your system is dark (same rule as app.js)
+document.documentElement.dataset.tone = document.documentElement.dataset.theme
+  || (["ember", "dusk", "ocean", "forest", "night", "image"].includes(document.documentElement.dataset.wall) || matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
 </script>
 <link rel="stylesheet" href="styles.css">
 </head>

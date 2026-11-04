@@ -240,7 +240,7 @@ for (const k of ["focus", "short", "long"]) {
 /* ---------- colour choices for each mode ---------- */
 const PRESETS = [["Malibu", "#4aa3f0"], ["Violet", "#8b5cf6"], ["Pink", "#ec4899"], ["Red", "#cf4129"], ["Orange", "#f59e0b"], ["Lime", "#84cc16"], ["Green", "#1b7a4e"], ["Teal", "#14b8a6"]];
 const MODE_NAMES = { focus: "Focus", short: "Short break", long: "Long break" };
-const DEFAULT_COLOR = { focus: "#4a6cf7", short: "#cf4129", long: "#1b7a4e" };
+const DEFAULT_COLOR = { focus: "#ff7a2f", short: "#cf4129", long: "#1b7a4e" };
 function readableOn(hex) {  // dark text on light colours, white on dark ones
   const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255).map(v => v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4));
   return .2126 * r + .7152 * g + .0722 * b > .3 ? "#0a2540" : "#fff";
@@ -711,17 +711,22 @@ $("closeSettings").onclick = () => dialog.close();
 dialog.onclick = e => { if (e.target === dialog) dialog.close(); };  // click on the dimmed backdrop
 
 // wallpaper: a preset (gradients in styles.css), an uploaded photo (kept in this browser only), or an image link
-const WALLS = [["plain", "Plain"], ["mist", "Mist"], ["sand", "Sand"], ["peach", "Peach"], ["sage", "Sage"], ["lavender", "Lavender"],
+const WALLS = [["ember", "Ember"], ["plain", "Plain"], ["mist", "Mist"], ["sand", "Sand"], ["peach", "Peach"], ["sage", "Sage"], ["lavender", "Lavender"],
   ["dusk", "Dusk"], ["ocean", "Ocean"], ["forest", "Forest"], ["night", "Night"]];
 const IMG_KEY = "wallpaper-image";  // not "dash-": the photo stays out of data.json, which is re-sent on every save
-let wall = Object.assign({ id: "plain", url: "", dim: 25 }, load("wallpaper", {}));
+let wall = Object.assign({ id: "ember", url: "", dim: 25 }, load("wallpaper", {}));
 const storedImage = () => { try { return localStorage.getItem(IMG_KEY); } catch { return null; } };
 const cssUrl = src => `url(${JSON.stringify(src)})`;
 function applyWallpaper() {
   const src = wall.id === "upload" ? storedImage() : wall.id === "url" ? wall.url : null;
   if (src) { root.dataset.wall = "image"; root.style.setProperty("--wall-img", cssUrl(src)); root.style.setProperty("--dim", wall.dim / 100); }
   else { root.style.removeProperty("--wall-img"); if (WALLS.some(([id]) => id === wall.id)) root.dataset.wall = wall.id; else delete root.dataset.wall; }
+  applyTone();
 }
+// light or dark colours: the theme you picked, or with Auto, dark on a dark wallpaper or when your system is dark
+const DARK_WALLS = ["ember", "dusk", "ocean", "forest", "night", "image"], systemDark = matchMedia("(prefers-color-scheme: dark)");
+const applyTone = () => root.dataset.tone = root.dataset.theme || (DARK_WALLS.includes(root.dataset.wall) || systemDark.matches ? "dark" : "light");
+systemDark.addEventListener("change", applyTone);
 function setWall(changes) { Object.assign(wall, changes); save("wallpaper", wall); applyWallpaper(); renderSettings(); }
 const wallMsg = text => $("wallMsg").textContent = text;
 
@@ -768,7 +773,7 @@ $("themeSeg").onclick = e => {
   if (!b) return;
   if (b.dataset.t) root.dataset.theme = b.dataset.t; else delete root.dataset.theme;
   save("theme", b.dataset.t || null);
-  renderSettings();
+  applyTone(); renderSettings();
 };
 const savedTheme = load("theme", null);
 if (savedTheme) root.dataset.theme = savedTheme;

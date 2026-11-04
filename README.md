@@ -7,10 +7,10 @@ focus calendar and a daily quote. Everything runs on your own computer.
 
 Click the sliders button in the top-right corner to:
 
-- **Pick a wallpaper**: choose a preset, upload your own photo, or paste an image link. Photos get a
+- **Pick a wallpaper**: choose a preset (the default, Ember, is dark with a warm glow), upload your own photo, or paste an image link. Photos get a
   "Darken" slider so the text stays readable. An uploaded photo is kept in this browser only (it is
   not written to `data.json`).
-- **Switch theme**: Auto (follows your system), Light or Dark.
+- **Switch theme**: Auto (dark on a dark wallpaper, otherwise follows your system), Light or Dark.
 - **Show or hide widgets**: turn off anything you don't use to keep the page simple.
 
 ## Arrange the cards
