@@ -3,6 +3,49 @@
 A local dashboard with a Pomodoro timer, tasks, habits, water tracker, deadlines, day counter,
 focus calendar and a daily quote. Everything runs on your own computer.
 
+## Customize
+
+Click the sliders button in the top-right corner to:
+
+- **Pick a wallpaper**: choose a preset (the default, Ember, is dark with a warm glow), upload your own photo, or paste an image link. Photos get a
+  "Darken" slider so the text stays readable. An uploaded photo is kept in this browser only (it is
+  not written to `data.json`).
+- **Switch theme**: Auto (dark on a dark wallpaper, otherwise follows your system), Light or Dark.
+- **Show or hide widgets**: turn off anything you don't use to keep the page simple.
+
+## Arrange the cards
+
+Grab the small handle on the top edge of any card (it appears when you hover) and drag it into any
+column, or into the full-width areas above or below the columns. Your layout is saved. You can also
+focus a handle and use the arrow keys: up and down within a column, left and right to the next area.
+Press Escape while dragging to cancel.
+
+To resize a card, drag the small handle in its bottom corner (bottom-left for cards in the right column):
+
+- Up or down changes the card's height. Lists, notes and the calendar scroll if you make the card
+  shorter than its content; other cards can't be made smaller than what's in them.
+- Sideways changes the width. In a column this moves the edge between that column and its neighbour;
+  in the full-width areas the card snaps to cover 1, 2 or 3 columns.
+- Double-click the handle to reset that card, or focus it and use the arrow keys.
+
+**Customize → Reset layout** puts every card back in its default place and size.
+
+## Stocks and news
+
+Click the chart button in the top-left corner to open the **Markets** sidebar, and the arrow inside it to
+close it. On a wide screen the dashboard moves over to make room; on a phone the sidebar slides over it.
+The sidebar remembers whether it was open.
+
+Prices and headlines come from [Finnhub](https://finnhub.io). Sign up for a free API key at
+https://finnhub.io/register, then paste it under **Customize → Stocks & news**.
+
+- Add tickers like `AAPL` or `BRK.B`. Prices refresh every minute while the sidebar is open; nothing is
+  fetched while it's closed.
+- News shows market headlines. Click a ticker to see that company's news from the last week, and click
+  the ticker chip next to "News" to go back.
+- The free plan mainly covers US-listed stocks; tickers outside it show "Not on free plan".
+- Your key is saved with the rest of your data (browser storage, and `data.json` when using the server).
+
 ## Run it
 
 1. Double-click `start.command` (macOS). The first run sets up Python and opens

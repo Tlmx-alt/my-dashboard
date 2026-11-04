@@ -73,81 +73,19 @@ function setSync(state) {
 }
 setSync();
 
-/* ---------- theme ---------- */
-const root = document.documentElement;
-const savedTheme = load("theme", null);
-if (savedTheme) root.dataset.theme = savedTheme;
-$("theme").onclick = () => {
-  const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
-  root.dataset.theme = dark ? "light" : "dark";
-  save("theme", root.dataset.theme);
-};
-
-/* ---------- confetti ---------- */
-const cvs = $("confetti"), cx = cvs.getContext("2d");
-let parts = [], raf = null;
-function sizeCanvas() { const r = devicePixelRatio || 1; cvs.width = innerWidth * r; cvs.height = innerHeight * r; cx.setTransform(r, 0, 0, r, 0, 0); }
-sizeCanvas(); addEventListener("resize", sizeCanvas);
-function confetti(x, y, count = 40, power = 1) {
-  if (reduceMotion) return;
-  const accent = getComputedStyle(document.body).getPropertyValue("--accent").trim();
-  const colors = [accent, "#f5b83d", "#8b5cf6", "#3b8fd9", "#ff6b8b", "#ffffff"];
-  for (let i = 0; i < count; i++) {
-    const a = Math.random() * Math.PI * 2, v = (2 + Math.random() * 6) * power;
-    parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 4 * power, r: Math.random() * Math.PI, vr: (Math.random() - .5) * .4,
-      w: 5 + Math.random() * 6, h: 3 + Math.random() * 4, c: colors[i % colors.length], life: 1 });
-  }
-  if (!raf) raf = requestAnimationFrame(drawConfetti);
-}
-function drawConfetti() {
-  cx.clearRect(0, 0, innerWidth, innerHeight);
-  parts = parts.filter(p => p.life > 0 && p.y < innerHeight + 20);
-  for (const p of parts) {
-    p.vy += .22; p.vx *= .985; p.x += p.vx; p.y += p.vy; p.r += p.vr; p.life -= .009;
-    cx.save(); cx.globalAlpha = Math.min(1, p.life * 2); cx.translate(p.x, p.y); cx.rotate(p.r);
-    cx.fillStyle = p.c; cx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h * Math.abs(Math.cos(p.r * 2)) + 1); cx.restore();
-  }
-  raf = parts.length ? requestAnimationFrame(drawConfetti) : (cx.clearRect(0, 0, innerWidth, innerHeight), null);
-}
-const burstAt = (node, count, power) => { const r = node.getBoundingClientRect(); confetti(r.left + r.width / 2, r.top + r.height / 2, count, power); };
-
-/* ---------- small animation helpers ---------- */
-function setNum(node, value) {
-  const from = +node.dataset.v || 0;
-  node.dataset.v = value;
-  if (reduceMotion || from === value) { node.textContent = value.toLocaleString(); return; }
-  if (value > from) { node.classList.remove("bump"); void node.offsetWidth; node.classList.add("bump"); }
-  const t0 = performance.now(), dur = 700;
-  const step = t => {
-    const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3);
-    node.textContent = Math.round(from + (value - from) * e).toLocaleString();
-    if (k < 1) requestAnimationFrame(step);
-  };
-  requestAnimationFrame(step);
-}
+/* ---------- small helpers ---------- */
+const setNum = (node, value) => node.textContent = value.toLocaleString();
 function removeAnimated(li, done) {
   if (reduceMotion) return done();
   li.style.height = li.offsetHeight + "px";
   li.classList.add("leaving");
   li.addEventListener("animationend", done, { once: true });
 }
-document.querySelectorAll(".grid > .card").forEach((c, i) => c.style.setProperty("--i", i));
-let spotRaf = null;
-document.querySelector(".grid").addEventListener("pointermove", e => {
-  const card = e.target.closest(".card");
-  if (!card || spotRaf) return;
-  spotRaf = requestAnimationFrame(() => {
-    const r = card.getBoundingClientRect();
-    card.style.setProperty("--mx", e.clientX - r.left + "px");
-    card.style.setProperty("--my", e.clientY - r.top + "px");
-    spotRaf = null;
-  });
-});
 
 /* ---------- header ---------- */
 const nameEl = $("name");
 nameEl.value = load("name", "");
-const fitName = () => nameEl.style.width = Math.max(9, nameEl.value.length + 1) + "ch";
+const fitName = () => nameEl.style.width = (nameEl.value ? nameEl.value.length + 1 : 9) + "ch";
 nameEl.oninput = () => { save("name", nameEl.value.trim()); fitName(); };
 nameEl.onkeydown = e => { if (e.key === "Enter") nameEl.blur(); };
 fitName();
@@ -155,7 +93,9 @@ fitName();
 let today = dayKey();
 function tickClock() {
   const d = new Date(), h = d.getHours();
-  $("now").textContent = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const parts = new Intl.DateTimeFormat([], { hour: "numeric", minute: "2-digit" }).formatToParts(d);  // big time, small AM/PM
+  const period = parts.find(p => p.type === "dayPeriod");
+  $("now").replaceChildren(parts.filter(p => p.type !== "dayPeriod").map(p => p.value).join("").trim(), period ? el("small", { textContent: period.value }) : "");
   $("date").textContent = d.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
   $("greet").textContent = h < 5 ? "Burning the midnight oil" : h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
   if (dayKey() !== today) { today = dayKey(); renderAll(); }
@@ -192,18 +132,16 @@ const QUOTES = [
   ["Men are disturbed not by things, but by the views which they take of things.", "Epictetus"],
 ];
 let quoteIdx = null;
-function showQuote(i, animate) {
+function showQuote(i) {
   quoteIdx = i;
   const [text, by] = QUOTES[i];
   $("qtext").textContent = text;
   $("qby").textContent = "— " + by;
-  if (animate && !reduceMotion) { const f = $("quote"); f.classList.remove("swap"); void f.offsetWidth; f.classList.add("swap"); }
 }
 const dailyQuote = () => Math.floor(new Date(today + "T00:00").getTime() / 864e5) % QUOTES.length;
-$("qnext").onclick = e => {
+$("qnext").onclick = () => {
   let i; do i = Math.floor(Math.random() * QUOTES.length); while (i === quoteIdx);
-  showQuote(i, true);
-  const b = e.currentTarget; b.classList.remove("spin"); void b.offsetWidth; b.classList.add("spin");
+  showQuote(i);
 };
 
 /* ---------- focus log + stats ---------- */
@@ -224,12 +162,7 @@ function renderStats() {
   setNum($("st-streak"), streak());
   $("goal").value = cfg.goal;
   $("goalbar").style.width = Math.min(100, s / cfg.goal * 100) + "%";
-  const days = [...Array(7)].map((_, i) => { const d = new Date(); d.setDate(d.getDate() - (6 - i)); return d; });
-  const vals = days.map(d => log[dayKey(d)] || 0), max = Math.max(4, ...vals);
-  $("weektotal").textContent = vals.reduce((a, b) => a + b, 0) + " this week";
-  $("week").replaceChildren(...days.map((d, i) => el("div", { className: i === 6 ? "today" : "", title: `${d.toLocaleDateString([], { weekday: "long" })}: ${vals[i]} sessions` },
-    Object.assign(el("i"), { style: `height:${Math.max(4, vals[i] / max * 100)}%;--d:${i}` }),
-    el("span", { textContent: d.toLocaleDateString([], { weekday: "narrow" }) }))));
+  $("goalbar").parentElement.title = `Daily goal: ${s} of ${cfg.goal} sessions`;
   renderCalendar();
 }
 $("goal").onchange = e => { cfg.goal = Math.min(30, Math.max(1, +e.target.value || cfg.goal)); save("cfg", cfg); renderStats(); };
@@ -239,24 +172,12 @@ const LABELS = { focus: "Time to focus", short: "Take a short break", long: "Tak
 const C = 2 * Math.PI * 120;
 const arc = $("arc");
 arc.style.strokeDasharray = C;
-let mode = "focus", total, remaining, endAt = null, timer = null, shownClock = "";
+let mode = "focus", total, remaining, endAt = null, timer = null;
 const fmt = s => pad(Math.floor(s / 60)) + ":" + pad(s % 60);
 
-function setClock(str) {
-  if (str === shownClock) return;
-  const b = $("clock");
-  if (b.children.length !== str.length) b.replaceChildren(...[...str].map(c => el("span", { className: "d", textContent: c })));
-  else [...str].forEach((c, i) => {
-    const s = b.children[i];
-    if (s.textContent === c) return;
-    s.textContent = c;
-    if (!reduceMotion && shownClock) { s.classList.remove("flip"); void s.offsetWidth; s.classList.add("flip"); }
-  });
-  shownClock = str;
-}
 function renderTimer() {
   const s = Math.ceil(remaining);
-  setClock(fmt(s));
+  $("clock").textContent = fmt(s);
   $("label").textContent = LABELS[mode];
   $("toggle").lastElementChild.textContent = timer ? "Pause" : (remaining < total ? "Resume" : "Start");
   $("toggle").firstElementChild.firstElementChild.setAttribute("href", timer ? "#i-pause" : "#i-play");
@@ -268,16 +189,6 @@ function renderTimer() {
   const inCycle = sessionsToday() % 4;
   $("dots").replaceChildren(...[0, 1, 2, 3].map(i => el("i", { className: i < inCycle ? "on" : "" })));
 }
-// focus colour: slowly drifts between blue and violet (updated 4x a second, only while in focus mode)
-function cycleHue() {
-  if (cfg.colors && cfg.colors.focus) return;  // you picked a focus colour: no drifting
-  if (reduceMotion) return document.documentElement.style.setProperty("--fh", "255");
-  if (mode !== "focus" || document.hidden) return;
-  const t = Date.now() / 1000;
-  document.documentElement.style.setProperty("--fh", (270 + 28 * Math.sin(t * 2 * Math.PI / 45)).toFixed(1));
-}
-setInterval(cycleHue, 500);
-
 const saveTimer = () => save("timer", { mode, remaining, running: !!timer, endAt });
 function setMode(m) { stop(); mode = m; total = remaining = cfg[m] * 60; saveTimer(); renderTimer(); }
 function stop() { clearInterval(timer); timer = null; saveTimer(); }
@@ -293,10 +204,7 @@ function nextMode() { return mode !== "focus" ? "focus" : (sessionsToday() % 4 =
 function logSession() { log[dayKey()] = sessionsToday() + 1; save("log", log); renderStats(); }
 function finish() {
   stop(); beep();
-  if (mode === "focus") {
-    logSession();
-    burstAt($("ring"), 90, 1.4);
-  }
+  if (mode === "focus") logSession();
   setMode(nextMode());
 }
 function beep() {
@@ -316,7 +224,7 @@ $("reset").onclick = () => setMode(mode);
 $("skip").onclick = () => setMode(mode === "focus" ? ((sessionsToday() + 1) % 4 === 0 ? "long" : "short") : "focus");
 $("tabs").onclick = e => { if (e.target.dataset.mode) setMode(e.target.dataset.mode); };
 document.addEventListener("keydown", e => {
-  if (e.code === "Space" && !/INPUT|TEXTAREA|BUTTON|SUMMARY|SELECT/.test(e.target.tagName)) { e.preventDefault(); $("toggle").click(); }
+  if (e.code === "Space" && !/INPUT|TEXTAREA|BUTTON|SUMMARY|SELECT/.test(e.target.tagName) && !document.querySelector(".c-timer").hidden && !$("settings").open) { e.preventDefault(); $("toggle").click(); }
 });
 for (const k of ["focus", "short", "long"]) {
   const input = $("s-" + k);
@@ -332,7 +240,7 @@ for (const k of ["focus", "short", "long"]) {
 /* ---------- colour choices for each mode ---------- */
 const PRESETS = [["Malibu", "#4aa3f0"], ["Violet", "#8b5cf6"], ["Pink", "#ec4899"], ["Red", "#cf4129"], ["Orange", "#f59e0b"], ["Lime", "#84cc16"], ["Green", "#1b7a4e"], ["Teal", "#14b8a6"]];
 const MODE_NAMES = { focus: "Focus", short: "Short break", long: "Long break" };
-const DEFAULT_COLOR = { focus: "#4aa3f0", short: "#cf4129", long: "#1b7a4e" };
+const DEFAULT_COLOR = { focus: "#ff7a2f", short: "#cf4129", long: "#1b7a4e" };
 function readableOn(hex) {  // dark text on light colours, white on dark ones
   const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255).map(v => v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4));
   return .2126 * r + .7152 * g + .0722 * b > .3 ? "#0a2540" : "#fff";
@@ -351,7 +259,7 @@ function setColor(mode, hex) {
 }
 function renderColors() {
   const box = $("colors"), c = cfg.colors || {};
-  box.replaceChildren(el("h3", { textContent: "Colors" }), ...Object.keys(MODE_NAMES).map(m => {
+  box.replaceChildren(...Object.keys(MODE_NAMES).map(m => {
     const cur = (c[m] || "").toLowerCase();
     const dots = PRESETS.map(([name, hex]) => {
       const b = el("button", { type: "button", className: "dot", ariaLabel: `${MODE_NAMES[m]}: ${name}`, title: name, onclick: () => setColor(m, hex) });
@@ -360,9 +268,9 @@ function renderColors() {
     const custom = !!cur && !PRESETS.some(([, h]) => h === cur);
     const picker = el("label", { className: "pick" + (custom ? " on" : ""), title: "Pick any color" },
       el("input", { type: "color", value: cur || DEFAULT_COLOR[m], ariaLabel: `${MODE_NAMES[m]}: custom color`, onchange: e => setColor(m, e.target.value) }));
-    const def = el("button", { type: "button", className: "def", textContent: m === "focus" ? "Blue to violet" : "Default", ariaLabel: `${MODE_NAMES[m]}: default`, onclick: () => setColor(m, null) });
+    const def = el("button", { type: "button", className: "def", textContent: "Default", ariaLabel: `${MODE_NAMES[m]}: default`, onclick: () => setColor(m, null) });
     def.setAttribute("aria-pressed", !cur);
-    return el("div", { className: "color-row" }, el("span", {}, el("i", { style: `--sw:${cur || DEFAULT_COLOR[m]}` }), MODE_NAMES[m]), el("div", { className: "sw" }, ...dots, picker, def));
+    return el("div", { className: "color-row" }, el("span", { textContent: MODE_NAMES[m] + " color" }), el("div", { className: "sw" }, ...dots, picker, def));
   }));
 }
 applyColors(); renderColors();
@@ -376,7 +284,6 @@ function renderTasks() {
   $("tasks").replaceChildren(...(tasks.length ? tasks.map(t => {
     const box = el("button", { className: "check", ariaLabel: "Toggle done", onclick: () => {
       t.done = !t.done; save("tasks", tasks);
-      if (t.done) burstAt(box, 18, .6);
       renderTasks();
     } }, icon("check"));
     box.setAttribute("aria-checked", t.done);
@@ -412,7 +319,6 @@ function renderHabits() {
     const box = el("button", { className: "check", ariaLabel: `Mark ${h.name} done today`, onclick: () => {
       h.days = on ? h.days.filter(d => d !== t) : [...h.days, t].slice(-400);
       save("habits", habits);
-      if (!on) burstAt(box, habits.every(x => x.days.includes(t)) ? 70 : 16, habits.every(x => x.days.includes(t)) ? 1.2 : .6);
       renderHabits();
     } }, icon("check"));
     box.setAttribute("aria-checked", on);
@@ -435,20 +341,25 @@ function renderCalendar() {
   const now = new Date(), first = new Date(now.getFullYear(), now.getMonth() + calOff, 1);
   $("calTitle").textContent = first.toLocaleDateString([], { month: "long", year: "numeric" });
   const dim = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
-  const deadlineDays = new Set(cds.map(c => c.date));
-  const heads = ["S", "M", "T", "W", "T", "F", "S"].map(d => el("span", { className: "dow", textContent: d }));
-  const cells = [...Array(first.getDay())].map(() => el("span"));
+  const heads = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(d => el("span", { className: "dow", textContent: d }));
+  const cells = [...Array(first.getDay())].map(() => el("span", { className: "day blank" }));
   for (let d = 1; d <= dim; d++) {
     const dt = new Date(first.getFullYear(), first.getMonth(), d), k = dayKey(dt), n = log[k] || 0;
     const lv = n === 0 ? 0 : n >= cfg.goal ? 3 : n >= cfg.goal / 2 ? 2 : 1;
-    const due = cds.filter(c => c.date === k).map(c => c.name);
-    cells.push(el("span", { className: `day lv${lv}` + (k === dayKey() ? " today" : "") + (deadlineDays.has(k) ? " due" : ""), textContent: d,
-      title: `${dt.toLocaleDateString([], { month: "short", day: "numeric" })}: ${n} session${n === 1 ? "" : "s"}` + (due.length ? ` · ${due.join(", ")}` : "") }));
+    const due = cds.filter(c => c.date === k).sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+    cells.push(el("div", { className: `day lv${lv}` + (dt.getDay() % 6 === 0 ? " wkend" : "") + (k === dayKey() ? " today" : "") + (due.length ? " due" : ""),
+      title: `${dt.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })}: ${n} focus session${n === 1 ? "" : "s"}` + (due.length ? ` · ${due.map(c => c.name).join(", ")}` : "") },
+      el("span", { className: "n", textContent: d }),
+      ...due.slice(0, 2).map(c => el("span", { className: "ev", textContent: (c.time ? new Date(k + "T" + c.time).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) + " " : "") + c.name })),
+      due.length > 2 ? el("span", { className: "more", textContent: `+${due.length - 2} more` }) : "",
+      n ? el("span", { className: "sess", textContent: `${n} focus` }) : ""));
   }
   $("cal").replaceChildren(...heads, ...cells);
+  $("calToday").hidden = calOff === 0;
 }
 $("calPrev").onclick = () => { calOff--; renderCalendar(); };
 $("calNext").onclick = () => { calOff++; renderCalendar(); };
+$("calToday").onclick = () => { calOff = 0; renderCalendar(); };
 
 /* ---------- deadlines: type it in plain words ---------- */
 let cds = load("countdowns", []);
@@ -580,6 +491,8 @@ $("cdForm").onsubmit = async e => {
   save("countdowns", cds);
   input.value = "";
   hint.replaceChildren(usedAI ? el("span", { className: "ai", textContent: "AI" }) : "", "Added ", el("b", { textContent: result.name }), " for " + prettyDate(result.date, result.time) + ".");
+  const added = hint.textContent;  // the confirmation fades out unless you have started typing the next one
+  setTimeout(() => { if (hint.textContent === added && !input.value) hint.replaceChildren(); }, 4000);
   renderCountdowns(); renderCalendar();
 };
 
@@ -598,9 +511,7 @@ function renderWater() {
   $("wbar").style.width = Math.min(100, n / cfg.waterGoal * 100) + "%";
 }
 const addWater = ml => {
-  const before = water[dayKey()] || 0, n = Math.max(0, before + ml);
-  water[dayKey()] = n; save("water", water); renderWater();
-  if (ml > 0 && before < cfg.waterGoal && n >= cfg.waterGoal) burstAt($("wplus"), 60, 1);
+  water[dayKey()] = Math.max(0, (water[dayKey()] || 0) + ml); save("water", water); renderWater();
 };
 $("wplus").onclick = () => addWater(250);
 $("wminus").onclick = () => addWater(-250);
@@ -646,30 +557,475 @@ notes.oninput = () => {
   noteT = setTimeout(() => { save("notes", notes.value); $("saved").textContent = "Saved"; setTimeout(() => $("saved").textContent = "", 1500); }, 400);
 };
 
-/* ---------- button ripple ---------- */
-document.addEventListener("pointerdown", e => {
-  const b = e.target.closest("button");
-  if (!b) return;
-  const r = b.getBoundingClientRect(), d = Math.max(r.width, r.height) * 2;
-  const rp = el("span", { className: "ripple" });
-  rp.style.cssText = `width:${d}px;height:${d}px;left:${e.clientX - r.left - d / 2}px;top:${e.clientY - r.top - d / 2}px`;
-  b.appendChild(rp);
-  rp.onanimationend = () => rp.remove();
-  if (b.closest(".c-timer") && !b.closest("details")) {
-    const ring = $("ring"); ring.classList.remove("pulse"); void ring.offsetWidth; ring.classList.add("pulse");
+/* ---------- stocks + news: Finnhub (free key), called straight from the browser ---------- */
+const FH = "https://finnhub.io/api/v1/";
+let fhKey = load("finnhubKey", "");
+let watch = load("watchlist", ["AAPL", "MSFT", "GOOGL"]);
+let quotes = {}, quotesAt = 0, news = [], newsAt = 0, newsFor = null;  // newsFor: a ticker, or null for market news
+// the sidebar on the left: open or closed is remembered, and nothing is fetched while it's closed
+const html = document.documentElement;
+const marketsOpen = () => html.dataset.markets === "open";
+function setMarketsOpen(open) {
+  if (open) html.dataset.markets = "open"; else delete html.dataset.markets;
+  $("openMarkets").setAttribute("aria-expanded", open);
+  save("marketsOpen", open);
+  if (open) { refreshMarkets(); $("closeMarkets").focus({ preventScroll: true }); }
+  else $("openMarkets").focus({ preventScroll: true });
+}
+$("openMarkets").onclick = () => setMarketsOpen(true);
+$("closeMarkets").onclick = () => setMarketsOpen(false);
+$("markets").addEventListener("keydown", e => { if (e.key === "Escape") setMarketsOpen(false); });
+if (load("marketsOpen", false)) html.dataset.markets = "open"; else delete html.dataset.markets;  // data.json wins over the early guess in index.html
+$("openMarkets").setAttribute("aria-expanded", marketsOpen());
+async function fh(path, params = {}, key = fhKey) {
+  let r;
+  try { r = await fetch(FH + path + "?" + new URLSearchParams({ ...params, token: key })); }
+  catch { throw Object.assign(new Error("offline"), { status: 0 }); }
+  if (!r.ok) throw Object.assign(new Error("Finnhub " + r.status), { status: r.status });
+  return r.json();
+}
+const FH_MSG = { 0: "Couldn't reach Finnhub. Check your connection.", 401: "Finnhub didn't accept your key. Update it in Customize.",
+  429: "Finnhub's free limit was reached. Trying again in a minute." };
+const fhMsg = e => FH_MSG[e.status] || "Finnhub had a problem. Trying again shortly.";
+const hasQuote = q => q && (q.c || q.pc);  // unknown tickers come back as all zeros
+const price = n => n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const ago = sec => { const m = Math.max(1, Math.round((Date.now() / 1000 - sec) / 60)); return m < 60 ? m + "m ago" : m < 1440 ? Math.round(m / 60) + "h ago" : Math.round(m / 1440) + "d ago"; };
+
+async function refreshQuotes() {
+  if (!fhKey || !marketsOpen() || !watch.length) return renderStocks();
+  quotesAt = Date.now();
+  const syms = [...watch];
+  const res = await Promise.allSettled(syms.map(symbol => fh("quote", { symbol })));
+  res.forEach((r, i) => { if (r.status === "fulfilled") quotes[syms[i]] = r.value; else if (r.reason.status === 403) quotes[syms[i]] = { plan: true }; });
+  const failed = res.find(r => r.status === "rejected" && r.reason.status !== 403);
+  $("stocksMsg").textContent = failed ? fhMsg(failed.reason) : "";
+  if (res.some(r => r.status === "fulfilled")) $("stocksAt").textContent = new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  renderStocks();
+}
+function renderStocks() {
+  $("marketsSetup").hidden = !!fhKey;
+  $("stocksMain").hidden = $("newsMain").hidden = $("stocksRefresh").hidden = $("stocksAt").hidden = !fhKey;
+  $("stocks").replaceChildren(...(watch.length ? watch.map(sym => {
+    const q = quotes[sym];
+    const symBtn = el("button", { className: "sym", textContent: sym, title: `Show ${sym} news`, onclick: () => setNewsFor(newsFor === sym ? null : sym) });
+    symBtn.setAttribute("aria-pressed", newsFor === sym);
+    let info;
+    if (!q) info = [el("span", { className: "px muted", textContent: "…" })];
+    else if (q.plan || !hasQuote(q)) info = [el("span", { className: "px muted", textContent: q.plan ? "Not on free plan" : "No data" })];
+    else {
+      const dp = q.dp ?? 0, d = q.d ?? 0;
+      info = [el("span", { className: "px", textContent: price(q.c) }),
+        el("span", { className: "chg" + (d > 0 ? " up" : d < 0 ? " down" : ""), textContent: (dp > 0 ? "+" : "") + dp.toFixed(2) + "%", title: `${d > 0 ? "+" : ""}${price(d)} today` })];
+    }
+    const li = el("li", { className: "stock" }, symBtn, ...info,
+      el("button", { className: "icon-btn del", ariaLabel: `Remove ${sym}`, onclick: () => removeAnimated(li, () => {
+        watch = watch.filter(x => x !== sym); delete quotes[sym]; save("watchlist", watch);
+        if (newsFor === sym) setNewsFor(null);
+        renderStocks();
+      }) }, icon("trash")));
+    return li;
+  }) : [el("li", { className: "empty", textContent: "Add a ticker to follow its price." })]));
+}
+$("stockForm").onsubmit = async e => {
+  e.preventDefault();
+  const input = $("stockInput"), btn = e.target.querySelector("button"), sym = input.value.trim().toUpperCase(), msg = t => $("stocksMsg").textContent = t;
+  if (!sym) return;
+  if (!/^[A-Z0-9.:^=-]{1,20}$/.test(sym)) return msg("Tickers use letters, numbers and dots, like AAPL or BRK.B.");
+  if (watch.includes(sym)) { input.value = ""; return; }
+  btn.classList.add("busy"); btn.disabled = true;
+  try {
+    const q = await fh("quote", { symbol: sym });
+    if (!hasQuote(q)) return msg(`Couldn't find ${sym}. Check the ticker.`);
+    quotes[sym] = q; watch.push(sym); save("watchlist", watch);
+    input.value = ""; msg(""); renderStocks();
+  } catch (err) { msg(err.status === 403 ? `${sym} isn't included in Finnhub's free plan.` : fhMsg(err)); }
+  finally { btn.classList.remove("busy"); btn.disabled = false; }
+};
+
+async function refreshNews() {
+  if (!fhKey || !marketsOpen()) return renderNews();
+  newsAt = Date.now();
+  const forSym = newsFor;
+  try {
+    const items = forSym
+      ? await fh("company-news", { symbol: forSym, from: dayKey(new Date(Date.now() - 7 * 864e5)), to: dayKey() })
+      : await fh("news", { category: "general" });
+    if (forSym !== newsFor) return;  // switched to another ticker while this was loading
+    const seen = new Set();
+    news = (Array.isArray(items) ? items : [])
+      .filter(n => n.headline && /^https?:\/\//.test(n.url) && !seen.has(n.headline) && seen.add(n.headline))
+      .sort((a, b) => b.datetime - a.datetime).slice(0, 8);
+    $("newsMsg").textContent = "";
+  } catch (err) {
+    if (forSym !== newsFor) return;
+    if (news === null) news = [];
+    $("newsMsg").textContent = fhMsg(err);
   }
-  if (b.id === "reset") { b.classList.remove("spin"); void b.offsetWidth; b.classList.add("spin"); }
+  renderNews();
+}
+function setNewsFor(sym) { newsFor = sym; news = null; renderStocks(); renderNews(); refreshNews(); }
+function renderNews() {
+  $("newsFilter").replaceChildren(!fhKey ? "" : newsFor
+    ? el("button", { className: "chip", ariaLabel: `Showing ${newsFor} news. Show market news instead`, title: "Back to market news", onclick: () => setNewsFor(null) }, newsFor, icon("x"))
+    : "Market");
+  $("news").replaceChildren(...(!fhKey ? [] : news === null ? [el("li", { className: "empty", textContent: "Loading…" })] : news.length
+    ? news.map(n => el("li", {}, el("a", { className: "headline", href: n.url, target: "_blank", rel: "noopener noreferrer" },
+        el("span", { textContent: n.headline }), el("small", { textContent: [n.source, n.datetime ? ago(n.datetime) : ""].filter(Boolean).join(" · ") }))))
+    : [el("li", { className: "empty", textContent: newsFor ? `No ${newsFor} news in the last week.` : "No headlines right now." })]));
+}
+
+// prices every minute and headlines every 10 minutes, only while the page is open and the card is showing
+function refreshMarkets(force) {
+  if (force || Date.now() - quotesAt > 60e3) refreshQuotes();
+  if (force || Date.now() - newsAt > 10 * 60e3) refreshNews();
+}
+setInterval(() => { if (!document.hidden) refreshMarkets(); }, 15e3);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshMarkets(); });
+$("stocksRefresh").onclick = () => refreshMarkets(true);
+document.querySelectorAll("[data-setup]").forEach(b => b.onclick = () => openSettings("fhKey"));
+
+async function saveKey() {
+  const input = $("fhKey"), key = input.value.trim(), msg = t => $("fhMsg").textContent = t;
+  if (!key) return;
+  msg("Checking key…");
+  try { await fh("quote", { symbol: "AAPL" }, key); }
+  catch (err) { return msg(err.status === 401 ? "Finnhub didn't accept that key. Check it and try again." : fhMsg(err)); }
+  fhKey = key; save("finnhubKey", key); input.value = "";
+  msg("Connected. Prices and news are loading.");
+  quotes = {}; news = null; renderSettings(); renderStocks(); renderNews(); refreshMarkets(true);
+}
+$("fhSave").onclick = saveKey;
+$("fhKey").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); saveKey(); } };
+$("fhRemove").onclick = () => {
+  fhKey = ""; save("finnhubKey", ""); quotes = {}; news = []; newsFor = null;
+  $("stocksMsg").textContent = $("newsMsg").textContent = "";
+  $("fhMsg").textContent = "Key removed.";
+  renderSettings(); renderStocks(); renderNews();
+};
+
+/* ---------- customize panel: wallpaper, theme, which widgets show ---------- */
+const root = document.documentElement, dialog = $("settings");
+function openSettings(focusId) { renderSettings(); dialog.showModal(); if (focusId) $(focusId).focus(); }
+$("openSettings").onclick = () => openSettings();
+$("closeSettings").onclick = () => dialog.close();
+dialog.onclick = e => { if (e.target === dialog) dialog.close(); };  // click on the dimmed backdrop
+
+// wallpaper: a preset (gradients in styles.css), an uploaded photo (kept in this browser only), or an image link
+const WALLS = [["ember", "Ember"], ["plain", "Plain"], ["mist", "Mist"], ["sand", "Sand"], ["peach", "Peach"], ["sage", "Sage"], ["lavender", "Lavender"],
+  ["dusk", "Dusk"], ["ocean", "Ocean"], ["forest", "Forest"], ["night", "Night"]];
+const IMG_KEY = "wallpaper-image";  // not "dash-": the photo stays out of data.json, which is re-sent on every save
+let wall = Object.assign({ id: "ember", url: "", dim: 25 }, load("wallpaper", {}));
+const storedImage = () => { try { return localStorage.getItem(IMG_KEY); } catch { return null; } };
+const cssUrl = src => `url(${JSON.stringify(src)})`;
+function applyWallpaper() {
+  const src = wall.id === "upload" ? storedImage() : wall.id === "url" ? wall.url : null;
+  if (src) { root.dataset.wall = "image"; root.style.setProperty("--wall-img", cssUrl(src)); root.style.setProperty("--dim", wall.dim / 100); }
+  else { root.style.removeProperty("--wall-img"); if (WALLS.some(([id]) => id === wall.id)) root.dataset.wall = wall.id; else delete root.dataset.wall; }
+  applyTone();
+}
+// light or dark colours: the theme you picked, or with Auto, dark on a dark wallpaper or when your system is dark
+const DARK_WALLS = ["ember", "dusk", "ocean", "forest", "night", "image"], systemDark = matchMedia("(prefers-color-scheme: dark)");
+const applyTone = () => root.dataset.tone = root.dataset.theme || (DARK_WALLS.includes(root.dataset.wall) || systemDark.matches ? "dark" : "light");
+systemDark.addEventListener("change", applyTone);
+function setWall(changes) { Object.assign(wall, changes); save("wallpaper", wall); applyWallpaper(); renderSettings(); }
+const wallMsg = text => $("wallMsg").textContent = text;
+
+$("wallFile").onchange = async e => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
+  wallMsg("Loading photo…");
+  try {
+    const img = new Image();
+    img.src = URL.createObjectURL(file);
+    await img.decode().finally(() => URL.revokeObjectURL(img.src));
+    // shrink big photos so they fit in browser storage; try smaller sizes if the first is still too large
+    for (const [max, q] of [[2560, .85], [1920, .8], [1440, .7]]) {
+      const k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = Object.assign(document.createElement("canvas"), { width: Math.round(img.naturalWidth * k), height: Math.round(img.naturalHeight * k) });
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      try { localStorage.setItem(IMG_KEY, c.toDataURL("image/jpeg", q)); wallMsg("Photo saved in this browser."); return setWall({ id: "upload" }); }
+      catch {}
+    }
+    wallMsg("That photo is too large to store. Try a smaller one, or use an image link.");
+  } catch { wallMsg("Couldn't read that file. Try a JPEG or PNG."); }
+};
+function useUrl() {
+  const raw = $("wallUrl").value.trim();
+  if (!raw) return;
+  let url;
+  try { url = new URL(raw); } catch {}
+  if (!url || !/^https?:$/.test(url.protocol)) return wallMsg("Paste a link that starts with https://");
+  wallMsg("Loading image…");
+  const img = new Image();
+  img.onload = () => { wallMsg(""); setWall({ id: "url", url: url.href }); };
+  img.onerror = () => wallMsg("Couldn't load an image from that link.");
+  img.src = url.href;
+}
+$("wallUrlBtn").onclick = useUrl;
+$("wallUrl").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); useUrl(); } };
+$("wallDim").oninput = e => { wall.dim = +e.target.value; root.style.setProperty("--dim", wall.dim / 100); };
+$("wallDim").onchange = () => save("wallpaper", wall);
+
+// theme: Auto follows the system setting
+$("themeSeg").onclick = e => {
+  const b = e.target.closest("[data-t]");
+  if (!b) return;
+  if (b.dataset.t) root.dataset.theme = b.dataset.t; else delete root.dataset.theme;
+  save("theme", b.dataset.t || null);
+  applyTone(); renderSettings();
+};
+const savedTheme = load("theme", null);
+if (savedTheme) root.dataset.theme = savedTheme;
+
+// widgets you can hide
+const WIDGETS = { quote: "Quote", timer: "Focus timer", tasks: "Tasks", deadlines: "Deadlines", habits: "Habits",
+  water: "Water", calendar: "Calendar", days: "Day counter", notes: "Notes" };
+let hidden = load("hidden", []);
+const applyWidgets = () => document.querySelectorAll("[data-w]").forEach(n => { if (n.dataset.w in WIDGETS) n.hidden = hidden.includes(n.dataset.w); });
+
+function renderSettings() {
+  const img = storedImage();
+  const tiles = WALLS.map(([id, name]) => el("button", { className: "wp", textContent: name, ariaLabel: `${name} wallpaper`, onclick: () => setWall({ id }) }));
+  WALLS.forEach(([id], i) => { tiles[i].dataset.w = id; tiles[i].setAttribute("aria-pressed", wall.id === id); });
+  // the photo and link stay as tiles once added, so you can switch back to them
+  for (const [id, src, name] of [["upload", img, "Your photo"], ["url", wall.url, "Image link"]]) {
+    if (!src) continue;
+    const t = el("button", { className: "wp", textContent: name, ariaLabel: `${name} wallpaper`, onclick: () => setWall({ id }) });
+    t.style.cssText = `background-image:${cssUrl(src)};color:#fff;text-shadow:0 1px 4px rgba(0,0,0,.5)`;
+    t.setAttribute("aria-pressed", wall.id === id);
+    tiles.push(t);
+  }
+  $("walls").replaceChildren(...tiles);
+  $("wallUrl").value = wall.url || "";
+  $("wallDim").value = wall.dim;
+  $("dimRow").hidden = root.dataset.wall !== "image";
+  document.querySelectorAll("#themeSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.t === (root.dataset.theme || "")));
+  $("widgetToggles").replaceChildren(...Object.entries(WIDGETS).map(([id, name]) => el("label", {}, name,
+    el("input", { type: "checkbox", checked: !hidden.includes(id), onchange: e => {
+      hidden = e.target.checked ? hidden.filter(x => x !== id) : [...hidden, id];
+      save("hidden", hidden); applyWidgets();
+    } }))));
+  $("fhKey").placeholder = fhKey ? `Key saved (…${fhKey.slice(-4)}). Paste to replace` : "Finnhub API key";
+  $("fhRemove").hidden = !fhKey;
+}
+applyWallpaper(); applyWidgets();
+
+/* ---------- arrange: drag cards by the handle on their top edge into any column or the wide areas ---------- */
+const ZONES = [...document.querySelectorAll("[data-zone]")];
+const layoutNow = () => Object.fromEntries(ZONES.map(z => [z.dataset.zone, [...z.children].filter(c => c.dataset.w).map(c => c.dataset.w)]));
+function applyLayout(lay) {
+  for (const z of ZONES) for (const id of lay[z.dataset.zone] || []) {
+    const card = document.querySelector(`.card[data-w="${id}"]`);
+    if (card) z.append(card);
+  }
+}
+const DEFAULT_LAYOUT = layoutNow();
+const savedLayout = load("layout", null);
+if (savedLayout) applyLayout(savedLayout);  // cards added in later versions stay where index.html puts them
+$("resetLayout").onclick = () => {
+  applyLayout(DEFAULT_LAYOUT); save("layout", null);
+  sizes = {}; cols = null; save("sizes", null); save("cols", null);
+  applyCols(); document.querySelectorAll(".card[data-w]").forEach(applySize);
+};
+document.querySelectorAll(".card[data-w]").forEach(card => card.prepend(
+  el("button", { className: "grip", ariaLabel: `Move ${WIDGETS[card.dataset.w] || "card"}. Drag, or use the arrow keys`, title: "Drag to move" })));
+
+let drag = null;
+document.addEventListener("pointerdown", e => {
+  const grip = e.target.closest(".grip");
+  if (!grip || e.button !== 0 || drag) return;
+  e.preventDefault();
+  const card = grip.parentElement, r = card.getBoundingClientRect();
+  const slot = el("div", { className: "drop-slot" + (card.classList.contains("c-cal") && !card.dataset.span ? " full" : "") });
+  if (card.dataset.span) slot.dataset.span = card.dataset.span;
+  slot.style.height = r.height + "px";
+  drag = { card, slot, id: e.pointerId, dx: e.clientX - r.left, dy: e.clientY - r.top, x: e.clientX, y: e.clientY, home: [card.parentElement, card.nextElementSibling] };
+  card.after(slot);
+  Object.assign(card.style, { width: r.width + "px", left: r.left + "px", top: r.top + "px" });
+  card.classList.add("dragging");
+  keepInPlace(slot, () => document.body.classList.add("arranging"));  // empty drop areas open up; don't let the page jump
+  grip.setPointerCapture(e.pointerId);
+  autoScroll();
+});
+document.addEventListener("pointermove", e => {
+  if (!drag || e.pointerId !== drag.id) return;
+  drag.x = e.clientX; drag.y = e.clientY;
+  drag.card.style.left = e.clientX - drag.dx + "px";
+  drag.card.style.top = e.clientY - drag.dy + "px";
+  placeSlot();
+});
+function placeSlot() {
+  const { x, y, card, slot } = drag;
+  let zone, best = Infinity;
+  for (const z of ZONES) {  // the area nearest the pointer
+    const r = z.getBoundingClientRect();
+    const dx = Math.max(r.left - x, 0, x - r.right), dy = Math.max(r.top - y, 0, y - r.bottom);
+    if (dx * dx + dy * dy < best) { best = dx * dx + dy * dy; zone = z; }
+  }
+  const zr = zone.getBoundingClientRect(), wide = zone.classList.contains("zone-wide");
+  const before = [...zone.children].find(c => {
+    if (c === card || c === slot || c.hidden) return false;
+    const r = c.getBoundingClientRect();
+    // columns stack top to bottom; the wide areas fill rows left to right
+    return !wide || r.width > zr.width * .9 ? y < r.top + r.height / 2 : y < r.top || (y <= r.bottom && x < r.left + r.width / 2);
+  });
+  if (before) { if (slot.nextElementSibling !== before) zone.insertBefore(slot, before); }
+  else if (zone.lastElementChild !== slot) zone.append(slot);
+}
+function keepInPlace(node, change) {  // make a layout change, then scroll so `node` stays where it was on screen
+  const y = node.getBoundingClientRect().top;
+  change();
+  scrollBy(0, node.getBoundingClientRect().top - y);
+}
+function autoScroll() {  // scroll while holding a card near the top or bottom of the window
+  if (!drag) return;
+  const edge = 70, v = drag.y < edge ? drag.y - edge : drag.y > innerHeight - edge ? drag.y - (innerHeight - edge) : 0;
+  if (v) { scrollBy(0, v / 4); placeSlot(); }
+  drag.raf = requestAnimationFrame(autoScroll);
+}
+function endDrag(cancel) {
+  const { card, slot, home, raf } = drag;
+  cancelAnimationFrame(raf);
+  if (cancel) { slot.remove(); home[0].insertBefore(card, home[1]); }
+  else slot.replaceWith(card);
+  card.classList.remove("dragging");
+  for (const k of ["width", "left", "top"]) card.style.removeProperty(k);
+  keepInPlace(card, () => document.body.classList.remove("arranging"));
+  drag = null;
+  if (!cancel) save("layout", layoutNow());
+}
+document.addEventListener("pointerup", e => { if (drag && e.pointerId === drag.id) endDrag(false); });
+document.addEventListener("pointercancel", e => { if (drag && e.pointerId === drag.id) endDrag(true); });
+document.addEventListener("keydown", e => {
+  if (drag) { if (e.key === "Escape") endDrag(true); return; }
+  // keyboard: up/down within an area, left/right to the previous/next area
+  const grip = e.target.closest && e.target.closest(".grip");
+  if (!grip || !/^Arrow(Up|Down|Left|Right)$/.test(e.key)) return;
+  e.preventDefault();
+  const card = grip.parentElement, zone = card.parentElement;
+  const sibs = [...zone.children].filter(c => !c.hidden), i = sibs.indexOf(card);
+  const order = ["top", "left", "mid", "right", "bottom"], zi = order.indexOf(zone.dataset.zone);
+  if (e.key === "ArrowUp" && i > 0) sibs[i - 1].before(card);
+  else if (e.key === "ArrowDown" && i < sibs.length - 1) sibs[i + 1].after(card);
+  else if (e.key === "ArrowLeft" && zi > 0) document.querySelector(`[data-zone="${order[zi - 1]}"]`).append(card);
+  else if (e.key === "ArrowRight" && zi < order.length - 1) document.querySelector(`[data-zone="${order[zi + 1]}"]`).append(card);
+  else return;
+  grip.focus();
+  save("layout", layoutNow());
+});
+
+/* ---------- resize: drag the handle in a card's corner ---------- */
+// height: the card itself. width: in a column, the edge between it and the next column; in a wide area, how many columns it covers
+const GROW = { tasks: "#tasks", deadlines: "#cds", habits: "#habits", days: "#dcs", notes: "#notes", calendar: "#cal" };  // the part that fills extra space and scrolls
+const COLS = ["left", "mid", "right"], MIN_COL = 280;
+let sizes = load("sizes", null) || {}, cols = load("cols", null);
+const growOf = card => GROW[card.dataset.w] ? card.querySelector(GROW[card.dataset.w]) : null;
+function applySize(card) {
+  const s = sizes[card.dataset.w] || {}, fill = growOf(card);
+  card.style.height = s.h && fill ? s.h + "px" : "";
+  card.style.minHeight = s.h && !fill ? s.h + "px" : "";  // cards without a scrolling part can grow but never cut off their content
+  card.classList.toggle("sized", !!s.h);
+  if (s.span) card.dataset.span = s.span; else delete card.dataset.span;
+}
+function applyCols() {
+  const wrap = document.querySelector(".wrap");
+  if (Array.isArray(cols) && cols.length === 3) wrap.style.setProperty("--cols", cols.map(f => `minmax(0, ${f}fr)`).join(" "));
+  else wrap.style.removeProperty("--cols");
+}
+function minHeight(card) {  // everything fits, except that the scrolling part may shrink to 80px
+  const fill = growOf(card), saved = sizes[card.dataset.w];
+  delete sizes[card.dataset.w]; applySize(card);
+  const natural = card.offsetHeight, min = fill ? natural - fill.offsetHeight + 80 : natural;
+  if (saved) sizes[card.dataset.w] = saved; applySize(card);
+  return Math.min(min, natural);
+}
+const colRects = () => COLS.map(z => document.querySelector(`[data-zone="${z}"]`).getBoundingClientRect());
+const isStacked = r => Math.abs(r[0].left - r[1].left) < 1;
+function setBoundary(zone, widths, delta) {  // move the edge right of the left/middle column (the right column moves the edge on its left)
+  const i = zone === "left" ? 0 : 1, w = [...widths], both = w[i] + w[i + 1];
+  w[i] = Math.min(both - MIN_COL, Math.max(MIN_COL, w[i] + delta));
+  w[i + 1] = both - w[i];
+  cols = w.map(x => +(x / 100).toFixed(3)); applyCols();
+}
+function spanAt(card, x, rects) {  // how many columns a card in a wide area should cover so its right edge is near x
+  const left = card.getBoundingClientRect().left;
+  const start = rects.reduce((b, r, i) => Math.abs(r.left - left) < Math.abs(rects[b].left - left) ? i : b, 0);
+  let span = 1;
+  for (let k = start + 1; k < 3; k++) if (x > rects[k].left + rects[k].width / 2) span++;
+  return span;
+}
+Object.values(GROW).forEach(sel => $(sel.slice(1)).classList.add("grow"));
+document.querySelectorAll(".card[data-w]").forEach(card => {
+  card.append(el("button", { className: "sizer", ariaLabel: `Resize ${WIDGETS[card.dataset.w] || "card"}. Drag, or use the arrow keys`, title: "Drag to resize. Double-click to reset" }));
+  applySize(card);
+});
+applyCols();
+
+let sizing = null;
+document.addEventListener("pointerdown", e => {
+  const handle = e.target.closest(".sizer");
+  if (!handle || e.button !== 0 || drag || sizing) return;
+  e.preventDefault();
+  const card = handle.parentElement, zone = card.parentElement, rects = colRects();
+  sizing = { card, id: e.pointerId, x0: e.clientX, y0: e.clientY, h0: card.offsetHeight, min: minHeight(card), zone: zone.dataset.zone,
+    wide: zone.classList.contains("zone-wide"), stacked: isStacked(rects), rects, widths: rects.map(r => r.width), moved: { x: false, y: false } };
+  handle.setPointerCapture(e.pointerId);
+  document.body.classList.add("resizing");
+});
+document.addEventListener("pointermove", e => {
+  const s = sizing;
+  if (!s || e.pointerId !== s.id) return;
+  const dx = e.clientX - s.x0, dy = e.clientY - s.y0, id = s.card.dataset.w, entry = sizes[id] = { ...sizes[id] };
+  // only change what you're actually dragging, so a sideways drag doesn't also fix the height
+  if (Math.abs(dy) > 4) s.moved.y = true;
+  if (Math.abs(dx) > 4) s.moved.x = true;
+  if (s.moved.y) entry.h = Math.round(Math.max(s.min, s.h0 + dy));
+  if (s.moved.x && !s.stacked) {
+    if (s.wide) entry.span = spanAt(s.card, e.clientX, s.rects);
+    else setBoundary(s.zone, s.widths, dx);
+  }
+  applySize(s.card);
+});
+function endSizing() {
+  if (!sizing) return;
+  document.body.classList.remove("resizing");
+  if (sizing.moved.x && !sizing.wide) save("cols", cols);
+  save("sizes", sizes);
+  sizing = null;
+}
+document.addEventListener("pointerup", e => { if (sizing && e.pointerId === sizing.id) endSizing(); });
+document.addEventListener("pointercancel", e => { if (sizing && e.pointerId === sizing.id) endSizing(); });
+document.addEventListener("dblclick", e => {
+  const handle = e.target.closest(".sizer");
+  if (!handle) return;
+  const card = handle.parentElement;
+  delete sizes[card.dataset.w]; applySize(card); save("sizes", sizes);
+});
+document.addEventListener("keydown", e => {  // keyboard: up/down for height, left/right for width
+  const handle = e.target.closest && e.target.closest(".sizer");
+  if (!handle || !/^Arrow(Up|Down|Left|Right)$/.test(e.key)) return;
+  e.preventDefault();
+  const card = handle.parentElement, zone = card.parentElement, id = card.dataset.w, entry = sizes[id] = { ...sizes[id] }, rects = colRects();
+  if (e.key === "ArrowUp" || e.key === "ArrowDown") entry.h = Math.max(minHeight(card), (entry.h || card.offsetHeight) + (e.key === "ArrowDown" ? 24 : -24));
+  else if (!isStacked(rects)) {
+    const dir = e.key === "ArrowRight" ? 1 : -1;
+    if (zone.classList.contains("zone-wide")) entry.span = Math.min(3, Math.max(1, (+card.dataset.span || (card.classList.contains("c-cal") ? 3 : 1)) + dir));
+    else { setBoundary(zone.dataset.zone, rects.map(r => r.width), dir * 24); save("cols", cols); }
+  }
+  applySize(card); save("sizes", sizes);
 });
 
 /* ---------- start ---------- */
 function renderAll() {
-  showQuote(dailyQuote(), quoteIdx !== null);
-  renderStats(); renderTasks(); renderHabits(); renderCountdowns(); renderWater(); renderDays();
+  showQuote(dailyQuote());
+  renderStats(); renderTasks(); renderHabits(); renderCountdowns(); renderWater(); renderDays(); renderStocks(); renderNews();
 }
 tickClock();
 setInterval(tickClock, 1000);
 setInterval(renderCountdowns, 60_000);
 renderAll();
+refreshMarkets(true);
 
 // restore the timer from the last visit
 const st = load("timer", null);
