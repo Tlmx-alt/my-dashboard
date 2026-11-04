@@ -25,8 +25,16 @@ document.documentElement.dataset.tone = document.documentElement.dataset.theme
 </head>
 <body>
 <div class="wall" aria-hidden="true"></div>
-<button class="icon-btn corner" id="openSettings" aria-label="Customize" title="Customize"><svg class="ico"><use href="#i-sliders"/></svg></button>
-<button class="icon-btn corner left" id="openMarkets" aria-label="Show stocks and news" title="Stocks & news" aria-controls="markets" aria-expanded="false"><svg class="ico"><use href="#i-trend"/></svg></button>
+<!-- sidebar: a button for each card, then stocks & news and Customize (a bar along the bottom on phones) -->
+<nav class="rail" aria-label="Dashboard">
+  <button class="rail-logo" id="railTop" aria-label="Back to top" title="Back to top"><svg class="ico"><use href="#i-logo"/></svg></button>
+  <div class="rail-items" id="railItems"></div>
+  <div class="rail-sep" aria-hidden="true"></div>
+  <button class="rail-btn" id="openMarkets" aria-label="Stocks and news" data-tip="Stocks & news" aria-controls="markets" aria-expanded="false"><svg class="ico"><use href="#i-trend"/></svg></button>
+  <div class="rail-end">
+    <button class="rail-btn" id="openSettings" aria-label="Customize" data-tip="Customize"><svg class="ico"><use href="#i-sliders"/></svg></button>
+  </div>
+</nav>
 
 <!-- Stocks + news: a sidebar on the left you can open and close -->
 <aside class="markets" id="markets" aria-label="Stocks and news">
@@ -257,6 +265,14 @@ document.documentElement.dataset.tone = document.documentElement.dataset.theme
   <symbol id="i-refresh" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.5 15a9 9 0 1 1-2.1-9.4L23 10"/></symbol>
   <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h3M11 7h9M4 17h9M17 17h3"/><circle cx="9" cy="7" r="2"/><circle cx="15" cy="17" r="2"/></symbol>
   <symbol id="i-trend" viewBox="0 0 24 24"><polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/></symbol>
+  <symbol id="i-logo" viewBox="0 0 24 24"><g transform="rotate(45 12 12)"><rect x="4" y="4" width="7" height="7" rx="2.2"/><rect x="13" y="4" width="7" height="7" rx="2.2"/><rect x="4" y="13" width="7" height="7" rx="2.2"/><rect x="13" y="13" width="7" height="7" rx="2.2"/></g></symbol>
+  <symbol id="i-timer" viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/></symbol>
+  <symbol id="i-tasks" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><polyline points="3 6 4 7 6 5"/><polyline points="3 12 4 13 6 11"/><polyline points="3 18 4 19 6 17"/></symbol>
+  <symbol id="i-flag" viewBox="0 0 24 24"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></symbol>
+  <symbol id="i-drop" viewBox="0 0 24 24"><path d="M12 2.7l5.7 5.6a8 8 0 1 1-11.4 0z"/></symbol>
+  <symbol id="i-cal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></symbol>
+  <symbol id="i-hourglass" viewBox="0 0 24 24"><path d="M6 2h12M6 22h12M7 2v4a5 5 0 0 0 2 4l3 2-3 2a5 5 0 0 0-2 4v4M17 2v4a5 5 0 0 1-2 4l-3 2 3 2a5 5 0 0 1 2 4v4"/></symbol>
+  <symbol id="i-note" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="14 3 14 9 20 9"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="14" y2="17"/></symbol>
   <symbol id="i-x" viewBox="0 0 24 24"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></symbol>
   <symbol id="i-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></symbol>
 </svg>
