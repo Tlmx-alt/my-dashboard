@@ -347,7 +347,7 @@ function renderCalendar() {
     const dt = new Date(first.getFullYear(), first.getMonth(), d), k = dayKey(dt), n = log[k] || 0;
     const lv = n === 0 ? 0 : n >= cfg.goal ? 3 : n >= cfg.goal / 2 ? 2 : 1;
     const due = cds.filter(c => c.date === k).sort((a, b) => (a.time || "").localeCompare(b.time || ""));
-    cells.push(el("div", { className: `day lv${lv}` + (k === dayKey() ? " today" : "") + (due.length ? " due" : ""),
+    cells.push(el("div", { className: `day lv${lv}` + (dt.getDay() % 6 === 0 ? " wkend" : "") + (k === dayKey() ? " today" : "") + (due.length ? " due" : ""),
       title: `${dt.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })}: ${n} focus session${n === 1 ? "" : "s"}` + (due.length ? ` · ${due.map(c => c.name).join(", ")}` : "") },
       el("span", { className: "n", textContent: d }),
       ...due.slice(0, 2).map(c => el("span", { className: "ev", textContent: (c.time ? new Date(k + "T" + c.time).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) + " " : "") + c.name })),
@@ -491,6 +491,8 @@ $("cdForm").onsubmit = async e => {
   save("countdowns", cds);
   input.value = "";
   hint.replaceChildren(usedAI ? el("span", { className: "ai", textContent: "AI" }) : "", "Added ", el("b", { textContent: result.name }), " for " + prettyDate(result.date, result.time) + ".");
+  const added = hint.textContent;  // the confirmation fades out unless you have started typing the next one
+  setTimeout(() => { if (hint.textContent === added && !input.value) hint.replaceChildren(); }, 4000);
   renderCountdowns(); renderCalendar();
 };
 
